@@ -5,8 +5,8 @@
     "url": "https://github.com/kfchou"
   },
   "metadata": {
-    "description": "LLM-maintained personal wiki skills for Claude Code",
-    "version": "1.0.0"
+    "description": "LLM-maintained personal wiki skills for Claude Code, backed by Roam Research via roam-mcp",
+    "version": "2.0.0"
   },
   "plugins": [
     {
@@ -15,8 +15,8 @@
         "source": "url",
         "url": "https://github.com/kfchou/wiki-skills.git"
       },
-      "description": "Five skills implementing Karpathy's LLM Wiki pattern: wiki-init, wiki-ingest, wiki-query, wiki-lint, wiki-update",
-      "version": "1.0.0",
+      "description": "Five skills implementing Karpathy's LLM Wiki pattern against a Roam Research graph (via roam-mcp): wiki-init, wiki-ingest, wiki-query, wiki-lint, wiki-update. Source text is uploaded paragraph-per-block so every excerpt has a stable ((uid)) for citation.",
+      "version": "2.0.0",
       "strict": true
     }
   ]
