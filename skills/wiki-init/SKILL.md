@@ -66,6 +66,20 @@ Conventions
   Block references use ((9-char-uid)). Embed inline excerpts with {{embed: ((uid))}}
   Tags: #tag and [[tag]] are equivalent; both produce :block/refs
   Each idea is its own block. Never simulate sub-bullets inside one block string
+  Outliner discipline
+    A block holds ONE idea. Never pack a comma-separated list of refs or
+    a structured `Key: a; Key: b` payload into one string
+    When an attribute has multiple values, write it as a parent attribute
+    block with one CHILD block per value:
+      Sources::
+        [[Source A]]
+        [[Source B]]
+        [[Source C]]
+    Multi-fact sections are also parent + children:
+      Pages updated::
+        [[Entity 1]]
+        [[Entity 2]]
+    A short single ref or 1-3 short tags may stay inline (Tags:: #ml #transformer)
   Page metadata is a set of flat top-level attribute blocks (Key:: value)
   Required attributes on every wiki page: Type::, Updated::
   Daily-note titles MUST use the ordinal date format (April 25th, 2026)
@@ -123,11 +137,14 @@ Key Entities / Concepts
 
 ### 7. Log the init operation
 
-Append a block to today's daily note (call `roam_create_block` with NO `page` arg — defaults to today's daily note). Use the ordinal date format if you need to reference the daily note explicitly.
+Append a block to today's daily note (call `roam_create_block` with NO `page` arg — defaults to today's daily note). Use the ordinal date format if you need to reference the daily note explicitly. Multi-value attributes are parent + children, never comma-joined into one string.
 
 ```
 [[Wiki Schema]] init | <domain> #wiki-log #wiki-init
-  Categories:: <comma-separated>
+  Categories::
+    <Category 1>
+    <Category 2>
+    ...
   Raw path:: <path>
 ```
 

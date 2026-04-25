@@ -117,7 +117,7 @@ This gives `(title, uid, edit-time)` triples for all wiki pages. Cache the set o
 
 Today's date in ordinal format → page title `Lint April 25th, 2026`.
 
-`roam_create_page("Lint <ordinal-date>")`, then build the report as block-tree children. Always write — do not ask permission.
+`roam_create_page("Lint <ordinal-date>")`, then build the report as a block-tree. Always write — do not ask permission. **One fact per block** — every offending page, missing attribute, claim, and conflicting page is its own block under a parent. No comma-joined lists inside one block string.
 
 ```
 Type:: #wiki-meta #lint
@@ -129,35 +129,54 @@ Summary
   🔵 Info:: <N>
 
 🔴 Pages Referenced But Not Created
-  [[Source Page]] references [[Missing Foo]] — page has no content
-    Fix:: create [[Missing Foo]] or replace the reference
+  [[Missing Foo]]
+    Referenced from::
+      [[Source Page A]]
+      [[Source Page B]]
+    Fix:: create [[Missing Foo]] or replace the references
 
 🔴 Missing Required Attributes
-  [[Page]] missing Type::, Updated::
+  [[Page]]
+    Missing::
+      Type::
+      Updated::
 
 🟡 Orphan Pages
-  [[Slug]] — no inbound references outside Wiki Index
-    Fix:: add link from [[Related Page]], or delete if no longer relevant
+  [[Slug]]
+    Status:: no inbound references outside [[Wiki Index]]
+    Fix:: add link from a related page, or delete if no longer relevant
 
 🟡 Contradictions
-  [[Page A]] says: "<claim>"
-  [[Page B]] says: "<conflicting claim>"
+  Conflict on <topic>
+    [[Page A]]
+      Claim:: "<claim>"
+    [[Page B]]
+      Claim:: "<conflicting claim>"
     Recommendation:: <which to trust, or "investigate further">
 
 🟡 Stale Claims
-  [[Page]] last updated <date>, contains "latest" — may be outdated
-    Fix:: re-verify and add an `Updated:: <today>` attribute block, or queue a wiki-update
+  [[Page]]
+    Last updated:: <date>
+    Trigger:: contains "latest"
+    Fix:: re-verify and append an `Updated:: <today>` attribute block, or queue a wiki-update
 
 🔵 Missing Concept Pages
-  [[Foo]] referenced N times but page has no content
+  [[Foo]]
+    Reference count:: N
     Fix:: run wiki-ingest or create a stub via wiki-update
 
 🔵 Coverage Gaps
-  Open question from [[Wiki Overview]]: "<question>"
+  Open question from [[Wiki Overview]]
+    Question:: "<question>"
     Suggestion:: search for <X> or ingest <source type>
 
 🔵 Missing Cross-References
-  [[Page A]] and [[Page B]] both discuss [[Entity]] but don't link to each other
+  [[Entity]]
+    Discussed by::
+      [[Page A]]
+      [[Page B]]
+    Issue:: pages do not link to each other
+    Fix:: queue [[Entity]] reference under the relevant section of each page
 ```
 
 Append to `[[Wiki Index]]` under a `Maintenance` category (create the category if it doesn't exist):
@@ -189,12 +208,18 @@ Status:: orphan
 
 ### 5. Append to today's daily note
 
-Always — do not ask permission:
+Always — do not ask permission. Counts and queued-fix references are siblings; never comma-joined.
 
 ```
-[[Wiki Schema]] lint | <N> errors, <N> warnings, <N> info #wiki-log #wiki-lint
+[[Wiki Schema]] lint #wiki-log #wiki-lint
   Report:: [[Lint <ordinal-date>]]
-  Fixed:: <list of TODOs queued, or "none">
+  🔴 Errors:: <N>
+  🟡 Warnings:: <N>
+  🔵 Info:: <N>
+  Fixes queued::
+    [[Page A]] — added missing cross-reference
+    [[Page B]] — flagged Status:: orphan
+    (or one block: "none")
 ```
 
 ## Common Mistakes
@@ -202,3 +227,4 @@ Always — do not ask permission:
 - **Trusting Datalog without sanity-checking** — verify each query against 1-2 known cases on the first lint run, especially the orphan query (the "exclude daily-note pages" predicate is locale-dependent).
 - **Mutating directly** — you can't. Every fix is a queued TODO or an appended attribute block.
 - **Skipping the daily-note log** — it's the only audit trail.
+- **Comma-joining offenders inside one block** — `[[a]], [[b]] missing Type::, Updated::` defeats the outliner. One offender per block, with structured children for the failure details.

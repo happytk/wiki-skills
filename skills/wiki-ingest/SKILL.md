@@ -52,36 +52,53 @@ Check existence first: `roam_fetch_page_by_title(<title>)`. If the page already 
 
 ### 5. Build the source page
 
-The source page layout — top-level blocks created via `roam_create_block` (capture every returned uid; you'll need them for citations):
+The source page layout — every concept is **its own block**. Multi-value attributes use parent + children, never comma-joined strings.
+
+Top-level blocks (each line below is a separate block created via `roam_create_block`; capture every returned uid for later citation):
 
 ```
 Type:: #wiki-source
 Source:: <URL or absolute file path under Raw path::>
 Source kind:: paper | article | transcript | code | other
-Tags:: #<topic> #<topic>
-Sources::                       (empty for source pages)
+Tags:: #<topic1> #<topic2>          (1-3 short tags inline is fine; otherwise split below)
 Updated:: <today, ordinal: April 25th, 2026>
 
 Summary
-  <2-3 paragraph synthesis in your own words. Each paragraph is its own block.>
-  <Inline citations to Raw Text:: blocks via ((uid)).>
+  <paragraph 1 — one block>
+  <paragraph 2 — one block>
+  <paragraph 3 — one block>          (each cites Raw Text:: via ((uid)) where applicable)
 
 Key Takeaways
-  <one bullet per block>
-  <one bullet per block>
+  <takeaway 1 — one block>
+  <takeaway 2 — one block>
   ...
 
 Entities & Concepts
-  [[Entity 1]] — <one-line note>
-  [[Concept 2]] — <one-line note>
+  [[Entity 1]]
+    <one-line note about how this source relates to the entity — one child block>
+  [[Concept 2]]
+    <one-line note — one child block>
+  ...
 
 Relation to Other Wiki Pages
-  Connects to [[Other Page]] because <reason>
-  Updates the claim in [[Other Page]] that <…>
+  Connects to [[Other Page]]
+    <reason — child block>
+  Updates the claim in [[Other Page A]]
+    <which claim, and how — child block>
 
 Raw Text
-  <paragraph 1 of the source verbatim, one block>
-  <paragraph 2 of the source verbatim, one block>
+  <paragraph 1 of the source verbatim — one block>
+  <paragraph 2 of the source verbatim — one block>
+  ...
+```
+
+If you have many tags or many topical refs, expand the inline form into parent + children:
+
+```
+Tags::
+  #<topic1>
+  #<topic2>
+  #<topic3>
   ...
 ```
 
@@ -97,23 +114,32 @@ Raw Text
 
 For each entity/concept this source touches:
 
-- **Page exists** (`roam_fetch_page_by_title` returns a tree): read it, add a child block under the relevant section, ensure the `Sources::` attribute lists this source's `[[<source title>]]`, update the `Updated::` attribute (append a new `Updated:: <today>` block — there is no in-place edit).
-- **Page doesn't exist:** `roam_create_page(<entity>)`, then create attribute + section blocks:
+- **Page exists** (`roam_fetch_page_by_title` returns a tree): read it, add a child block under the relevant section. For `Sources::` — if it's currently a parent attribute block, append `[[<source title>]]` as a new child. If it's a single-value inline attribute, append a sibling `Sources::` block (we cannot mutate). Always append a fresh `Updated:: <today>` block at depth 0 (there is no in-place edit).
+- **Page doesn't exist:** `roam_create_page(<entity>)`, then create attribute + section blocks. One concept per block; multi-value attributes use parent + children:
 
 ```
 Type:: #wiki-entity            (or #wiki-concept)
-Sources:: [[<this source title>]]
-Tags:: #<topic>
+Sources::
+  [[<this source title>]]      (additional source pages will be added here as siblings on future ingests)
+Tags::
+  #<topic1>
+  #<topic2>
 Updated:: <today>
 
 Description
-  <synthesis in your own words, citing ((uid))s into Raw Text:: of the relevant source pages>
+  <paragraph 1 — one block, citing ((uid)) into Raw Text:: of the source>
+  <paragraph 2 — one block>
 
 Appearances in Sources
-  [[<source title>]] — <one-line note>  ((uid-of-key-quote))
+  [[<source title>]]
+    <one-line note — child block>
+    ((uid-of-key-quote))         (separate child block for the citation)
 
 Related Concepts
-  [[<related>]] — <relationship>
+  [[<related entity 1>]]
+    <relationship — child block>
+  [[<related entity 2>]]
+    <relationship — child block>
 ```
 
 When the original phrasing matters, `{{embed: ((uid))}}` the source block instead of paraphrasing.
@@ -149,14 +175,20 @@ Append a fresh `Updated:: <today>` attribute block at depth 0.
 
 ### 10. Log to today's daily note
 
-Append (no `page` arg, defaults to today's daily note):
+Append (no `page` arg, defaults to today's daily note). Multi-value lists are parent attribute blocks with one child per item — never comma-joined into a single block string.
 
 ```
 [[Wiki Schema]] ingest | <source title> #wiki-log #wiki-ingest
   Source:: <URL or path>
   Page:: [[<source title>]]
-  Pages updated:: [[<entity1>]], [[<entity2>]], ...
-  Backlinks added on:: [[<page A>]], [[<page B>]]
+  Pages updated::
+    [[<entity1>]]
+    [[<entity2>]]
+    ...
+  Backlinks added on::
+    [[<page A>]]
+    [[<page B>]]
+    ...
 ```
 
 ### 11. Report to user
@@ -174,3 +206,4 @@ Append (no `page` arg, defaults to today's daily note):
 - **Skipping the backlink audit** — set-difference between `roam_search_for_tag` and `roam_search_by_text` is the whole point.
 - **Forgetting to capture uids** — `roam_create_block` returns `uid` and `created_uids`; thread them into your subsequent citation blocks rather than re-fetching.
 - **Faking sub-bullets with `-`** — Roam treats one block as one idea. Use `children` instead.
+- **Comma-joining multi-value attributes** — `Sources:: [[a]], [[b]], [[c]]` defeats the outliner. Write the parent `Sources::` block, then one child block per ref. Same for `Pages updated::`, `Backlinks added on::`, `Tags::` (when more than 2-3).
