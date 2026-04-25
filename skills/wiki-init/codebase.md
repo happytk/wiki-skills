@@ -1,6 +1,6 @@
-# Codebase Wiki Guide
+# Codebase Wiki Guide (Roam)
 
-Use this when `wiki-init` is configured for a codebase domain. Covers structure, ingestion order, exploration strategy, and decision capture.
+Use this when `wiki-init` is configured for a codebase domain. Covers page-title conventions, ingestion order, exploration strategy, and decision capture, all targeting a Roam Research graph via roam-mcp.
 
 ---
 
@@ -19,7 +19,7 @@ Modules | APIs | Decisions | Flows
 
 ## What to Ingest First
 
-Order matters — later pages can cross-reference earlier ones:
+Order matters — later pages can cross-reference earlier ones via `[[Page Title]]`:
 
 1. Top-level `README.md` and any `docs/` directory
 2. Existing ADRs or decision docs (`docs/adr/`, `DECISIONS.md`, etc.)
@@ -51,8 +51,8 @@ Resist documenting everything at once. Five deep pages beat fifty shallow ones.
 
 **Two types:**
 
-- **Sourced** — a formal ADR or decision doc exists. Ingest it as a source; the wiki page synthesizes and cross-references affected modules/flows.
-- **Reconstructed** — no formal doc exists. The decision is inferred from code structure, git history, dependency choices, or naming conventions. The wiki page is the first and only written record.
+- **Sourced** — a formal ADR or decision doc exists. Ingest it as a source; the wiki page synthesizes and cross-references affected modules/flows. The synthesis page should `((uid))`-cite the original ADR text uploaded under `Raw Text::` on the source page.
+- **Reconstructed** — no formal doc exists. The decision is inferred from code structure, git history, dependency choices, or naming conventions. The wiki page is the first and only written record. Cite specific files/lines inline (e.g. `src/db/pool.ts:42`) and capture supporting commit SHAs.
 
 Reconstructed decisions are often more valuable than sourced ones — they surface the implicit choices that were never written down.
 
@@ -66,16 +66,36 @@ When you notice one, create a `Decisions` page immediately rather than noting it
 
 ---
 
-## Slug Conventions
+## Page Title Conventions
 
-`wiki/pages/` is flat. Use prefixes to group related pages:
+Roam pages use natural titles. For a codebase wiki, **use prefixes** because module names frequently collide with concept names (e.g. "Auth" the module vs. "Auth" the abstract concept).
 
-| Prefix | Example | Use for |
-|---|---|---|
-| `mod-` | `mod-auth-service` | Module/service pages |
-| `api-` | `api-user-endpoints` | API surface pages |
-| `dec-` | `dec-postgres-over-mysql` | Decisions (sourced or reconstructed) |
-| `flow-` | `flow-checkout-request` | End-to-end flows |
+| Prefix          | Example                            | Use for                           |
+|-----------------|------------------------------------|-----------------------------------|
+| `Mod: …`        | `Mod: Auth Service`                | Module/service pages              |
+| `API: …`        | `API: User Endpoints`              | API surface pages                 |
+| `Decision: …`   | `Decision: Postgres over MySQL`    | Decisions (sourced or reconstructed) |
+| `Flow: …`       | `Flow: Checkout Request`           | End-to-end flows                  |
+
+For non-codebase wikis, drop prefixes — Roam's `[[Attention Is All You Need]]` is the idiomatic form.
+
+---
+
+## Page Layout (Roam attribute blocks, not YAML)
+
+Every codebase wiki page has flat top-level attribute blocks at depth 0:
+
+```
+Type:: #wiki-page
+Category:: Module | API | Decision | Flow
+Sources:: [[Source Page Title 1]], [[Source Page Title 2]]
+Updated:: April 25th, 2026
+Tags:: #auth #postgres
+```
+
+…followed by section blocks (`Summary`, `Boundaries`, `Decisions Affecting This`, `Cross-References`, etc.) as siblings.
+
+When a claim ties to a specific source paragraph, cite via `((uid))` into that source's `Raw Text::` block.
 
 ---
 
@@ -83,10 +103,10 @@ When you notice one, create a `Decisions` page immediately rather than noting it
 
 Codebases change. Keep the wiki current by:
 
-- Running `wiki-lint` after significant refactors to find stale claims
-- Using `wiki-update` when a module is renamed, split, or deleted
-- Noting the approximate date or git ref a claim was verified: `> Verified ~2025-01`
-- Flagging pages with `stale: true` in frontmatter when you know they need revisiting
+- Running `wiki-lint` after significant refactors to find stale claims (Datalog query on `:edit/time`)
+- Using `wiki-update` when a module is renamed, split, or deleted (queues `#wiki-change-request` TODO blocks for you to apply manually)
+- Noting the approximate date or git ref a claim was verified by adding a `Verified:: ~2026-01 (sha abc1234)` attribute block
+- Flagging pages that need revisiting with a `Stale:: true` attribute block
 
 ---
 
@@ -115,11 +135,11 @@ This distinction must be actively maintained on every ingest and update.
    - Missing sections (no setup instructions, no contributing guide, no description of what the project does)
    - Outdated content (references to removed modules, stale commands)
    - Content that belongs in the wiki, not the README (lengthy architecture explanations, decision rationale)
-   - Present suggested edits to the user and offer to apply them
+   - Present suggested edits to the user and offer to apply them via the editing tools (not via roam-mcp — README edits land on disk)
 
 **Subdirectory READMEs** (`src/auth/README.md`, etc.) follow the same pattern — synthesize design intent into the wiki, evaluate and suggest improvements to the file itself.
 
-This rule is written into `SCHEMA.md` at init time so it is enforced on every subsequent operation.
+This rule is written into `[[Wiki Schema]]` at init time so it is enforced on every subsequent operation.
 
 ---
 
@@ -131,4 +151,4 @@ Anchor claims to specific locations using inline code paths:
 The request router is defined in `src/server/router.ts` and delegates to handlers in `src/handlers/`.
 ```
 
-Do not embed full code snippets in wiki pages. The wiki describes *what* and *why*; the codebase is the source of truth for *how*.
+Do not embed full code snippets in wiki pages. The wiki describes *what* and *why*; the codebase is the source of truth for *how*. If you must capture a snippet for analysis, upload it to the source page's `Raw Text::` section as one block per logical unit, then `((uid))`-cite from analysis pages.

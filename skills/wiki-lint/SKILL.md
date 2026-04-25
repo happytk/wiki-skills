@@ -1,112 +1,204 @@
 ---
 name: wiki-lint
-description: Use when auditing a wiki for health issues — contradictions between pages, orphan pages, broken cross-references, stale claims, missing pages, or coverage gaps. Run after every 5-10 ingests.
+description: Use when auditing a Roam-backed wiki for health issues — orphan pages, stale claims, broken references, missing pages, contradictions, and coverage gaps. Run after every 5-10 ingests. Uses Datalog queries against the Roam graph plus LLM reading for semantic checks.
 ---
 
 # Wiki Lint
 
-Audit the wiki. Produce a categorized report. Offer concrete fixes. Log the operation.
+Audit the Roam wiki. Produce a categorized report as a new `[[Lint <date>]]` page. Offer concrete fixes (which queue as `#wiki-change-request` TODOs since roam-mcp can't mutate). Always log to today's daily note.
 
 ## Pre-condition
 
-Find `SCHEMA.md` (search from cwd upward, or `~/wikis/`). If not found, tell the user to run `wiki-init` first. Read it to get wiki root path and conventions.
+Locate the wiki:
+1. `roam_fetch_page_by_title("Wiki Schema")`
+2. Fall back to `roam_search_by_text("Wiki Schema")`
+3. If neither finds it, tell the user to run `wiki-init` first
+
+Read the schema for category list and conventions.
 
 ## Process
 
 ### 1. Build the page inventory
 
-Read `wiki/index.md`, `wiki/overview.md`, and all files in `wiki/pages/`. Build a map of:
-- All existing slugs (filenames without `.md`)
-- All `[[slug]]` references found in any page
-- All `sources` listed in frontmatter
+Use Datalog (via `roam_datomic_query`) so you don't have to fetch pages one at a time:
+
+**All wiki-managed pages** (we tag them `#wiki-source`, `#wiki-entity`, `#wiki-page`, `#wiki-analysis`, `#wiki-meta`):
+
+```clojure
+[:find ?title ?uid ?edit
+ :where
+ [?p :node/title ?title]
+ [?p :block/uid ?uid]
+ [?p :edit/time ?edit]
+ [?p :block/children ?c]
+ [?c :block/refs ?tag]
+ [?tag :node/title ?tagname]
+ [(contains? #{"wiki-source" "wiki-entity" "wiki-page" "wiki-analysis" "wiki-meta"} ?tagname)]]
+```
+
+This gives `(title, uid, edit-time)` triples for all wiki pages. Cache the set of titles for orphan detection.
 
 ### 2. Run all checks
 
+> **Datalog correctness caveat:** the queries below are best-effort against the Roam pull schema (`:node/title`, `:block/string`, `:block/uid`, `:block/children`, `:block/refs`, `:edit/time`). On the first lint run, sanity-check each query's output against a few known pages before trusting the report.
+
 **🔴 Errors (must fix)**
 
-- **Broken links** — `[[slug]]` references where no corresponding `wiki/pages/<slug>.md` exists
-- **Missing frontmatter** — pages without required `title`, `tags`, `sources`, or `updated` fields
+- **Pages referenced but never created** — Roam treats unresolved `[[Foo]]` as a virtual page with no content. Find blocks that ref a page entity whose own `:block/children` set is empty:
+
+  ```clojure
+  [:find (distinct ?reffed-title)
+   :where
+   [?b :block/refs ?p]
+   [?p :node/title ?reffed-title]
+   [(missing? $ ?p :block/children)]]
+  ```
+
+  These are the "broken links" of the Roam world. Recommend create-or-remove.
+
+- **Missing required attributes** — for each wiki page, check that `Type::` and `Updated::` blocks exist as direct children. A page missing them is malformed:
+
+  ```clojure
+  [:find ?title
+   :where
+   [?p :node/title ?title]
+   [?p :block/children ?c]
+   [?c :block/string ?s]
+   [(clojure.string/starts-with? ?s "Type:: #wiki-")]
+   ;; …then a not-clause for pages without an Updated:: child
+  ]
+  ```
+
+  (Run a separate query for `Updated::` and set-difference in code.)
 
 **🟡 Warnings (should fix)**
 
-- **Orphan pages** — pages with zero inbound `[[slug]]` links from any other page (excluding index.md and overview.md)
-- **Contradictions** — claims in one page that directly conflict with claims in another (look for the same entity described differently: dates, counts, names, relationships)
-- **Stale claims** — pages not updated within 90 days that contain "current", "latest", "recent", "state-of-the-art", or year literals two or more years old
+- **Orphan pages** — wiki pages with zero inbound `:block/refs` from anywhere except `[[Wiki Index]]` and the daily-note log. Approximate with:
+
+  ```clojure
+  [:find ?title
+   :where
+   [?p :node/title ?title]
+   [?p :block/children ?c]
+   [?c :block/refs ?meta]
+   [?meta :node/title "wiki-page"]   ;; or wiki-source/wiki-entity
+   (not-join [?p]
+     [?b :block/refs ?p]
+     [?b :block/page ?bp]
+     [?bp :node/title ?bp-title]
+     [(not= ?bp-title "Wiki Index")]
+     [(not (clojure.string/starts-with? ?bp-title "April"))])]   ;; rough exclusion of daily notes
+  ```
+
+  Tune the daily-note exclusion to your locale's date format. This query is best-effort; verify with one or two known orphans before bulk action.
+
+- **Contradictions** — LLM check, not Datalog. For each wiki page modified in the last lint window, fetch and read; flag claims that conflict with claims in other pages on the same entity (different dates, counts, names, relationships).
+
+- **Stale claims** — Datalog: pages with `:edit/time` older than 90 days that contain text matching `current|latest|recent|state-of-the-art` or any year literal two-or-more years old:
+
+  ```clojure
+  [:find ?title ?edit
+   :where
+   [?p :node/title ?title]
+   [?p :edit/time ?edit]
+   [(< ?edit <90-days-ago-ms>)]
+   [?p :block/children ?c]
+   [?c :block/string ?s]
+   [(re-find #"(?i)current|latest|recent|state-of-the-art|202[0-3]" ?s)]]
+  ```
 
 **🔵 Info (consider addressing)**
 
-- **Missing concept pages** — `[[slug]]` references that appear 3+ times across the wiki but have no dedicated page
-- **Coverage gaps** — open questions listed in `overview.md` that could be answered by a web search or new ingest
-- **Missing cross-references** — two pages that discuss the same entity but don't link to each other
+- **Missing concept pages** — `[[Foo]]` references that appear 3+ times across the wiki but `[[Foo]]` has no content of its own. Reuse the broken-links query and add a count threshold.
+- **Coverage gaps** — open questions listed in `[[Wiki Overview]]` (`Open Questions` section) that could be answered by a web search or a new ingest. LLM judgment.
+- **Missing cross-references** — pages that both discuss `[[Entity]]` but don't link to each other. Compute by joining `roam_search_for_tag(<entity>)` results in code.
 
 ### 3. Write the lint report
 
-Write `wiki/pages/lint-<today>.md` (do not ask permission — always write this):
+Today's date in ordinal format → page title `Lint April 25th, 2026`.
 
-```markdown
----
-title: Lint Report <today>
-tags: [lint, maintenance]
-sources: []
-updated: <today>
----
+`roam_create_page("Lint <ordinal-date>")`, then build the report as block-tree children. Always write — do not ask permission.
 
-# Lint Report — <today>
+```
+Type:: #wiki-meta #lint
+Updated:: <today, ordinal>
 
-## Summary
-- 🔴 Errors: N
-- 🟡 Warnings: N
-- 🔵 Info: N
+Summary
+  🔴 Errors:: <N>
+  🟡 Warnings:: <N>
+  🔵 Info:: <N>
 
-## 🔴 Broken Links
-- [[source-page]] references [[missing-slug]] — does not exist
-  Fix: create the page or remove the reference
+🔴 Pages Referenced But Not Created
+  [[Source Page]] references [[Missing Foo]] — page has no content
+    Fix:: create [[Missing Foo]] or replace the reference
 
-## 🔴 Missing Frontmatter
-- [[page]] is missing: title, updated
+🔴 Missing Required Attributes
+  [[Page]] missing Type::, Updated::
 
-## 🟡 Orphan Pages
-- [[slug]] — no inbound links
-  Fix: add link from [[related-page]], or delete if no longer relevant
+🟡 Orphan Pages
+  [[Slug]] — no inbound references outside Wiki Index
+    Fix:: add link from [[Related Page]], or delete if no longer relevant
 
-## 🟡 Contradictions
-- [[page-a]] says: "<claim>"
-- [[page-b]] says: "<conflicting claim>"
-  Recommendation: <which to trust, or "investigate further">
+🟡 Contradictions
+  [[Page A]] says: "<claim>"
+  [[Page B]] says: "<conflicting claim>"
+    Recommendation:: <which to trust, or "investigate further">
 
-## 🟡 Stale Claims
-- [[page]] last updated <date>, contains "latest" — may be outdated
-  Fix: re-verify claims or add a "as of <date>" qualifier
+🟡 Stale Claims
+  [[Page]] last updated <date>, contains "latest" — may be outdated
+    Fix:: re-verify and add an `Updated:: <today>` attribute block, or queue a wiki-update
 
-## 🔵 Missing Concept Pages
-- [[slug]] referenced N times but no page exists
-  Fix: run wiki-ingest or create a stub
+🔵 Missing Concept Pages
+  [[Foo]] referenced N times but page has no content
+    Fix:: run wiki-ingest or create a stub via wiki-update
 
-## 🔵 Coverage Gaps
-- Open question from overview.md: "<question>"
-  Suggestion: search for <X> or ingest <source type>
+🔵 Coverage Gaps
+  Open question from [[Wiki Overview]]: "<question>"
+    Suggestion:: search for <X> or ingest <source type>
 
-## 🔵 Missing Cross-References
-- [[page-a]] and [[page-b]] both discuss <entity> but don't link to each other
+🔵 Missing Cross-References
+  [[Page A]] and [[Page B]] both discuss [[Entity]] but don't link to each other
 ```
 
-Add the lint report to `wiki/index.md` under a Maintenance category (create it if it doesn't exist).
+Append to `[[Wiki Index]]` under a `Maintenance` category (create the category if it doesn't exist):
+
+```
+[[Lint <ordinal-date>]] — <N errors, N warnings, N info> _(lint <date>)_
+```
 
 ### 4. Offer concrete fixes
 
-For each fixable category, offer:
-- **Broken links:** "Remove the broken `[[slug]]` references? (I'll show each change before writing)"
-- **Missing cross-references:** "Add the missing links between these page pairs?"
-- **Orphan page tags:** "Add `status: orphan` to frontmatter of orphan pages?"
-- **Missing frontmatter:** "Add missing frontmatter fields with placeholder values?"
+For each fixable category, offer to queue a `#wiki-change-request` TODO under the affected page (since direct mutation isn't possible). Show the exact block content before queuing.
 
-Show the exact diff for each change before writing. Apply only after confirmation.
+For example, for a missing cross-reference between `[[Page A]]` and `[[Page B]]`:
 
-### 5. Append to `wiki/log.md`
-
-Always append — do not ask permission:
 ```
-## [<today>] lint | <N errors> errors, <N warnings> warnings, <N info> info
-Report: [[lint-<today>]]
-Fixed: <list what was auto-fixed, or "none">
+{{[[TODO]]}} Add [[Page B]] reference under <section name> #wiki-change-request
+  Source:: lint report [[Lint <ordinal-date>]]
 ```
+
+`roam_create_block(content=<above>, page="Page A")`. Apply only after per-fix confirmation.
+
+For orphan pages, propose tagging:
+
+```
+Status:: orphan
+```
+
+(an attribute block, not a TODO — it's metadata, not an action).
+
+### 5. Append to today's daily note
+
+Always — do not ask permission:
+
+```
+[[Wiki Schema]] lint | <N> errors, <N> warnings, <N> info #wiki-log #wiki-lint
+  Report:: [[Lint <ordinal-date>]]
+  Fixed:: <list of TODOs queued, or "none">
+```
+
+## Common Mistakes
+
+- **Trusting Datalog without sanity-checking** — verify each query against 1-2 known cases on the first lint run, especially the orphan query (the "exclude daily-note pages" predicate is locale-dependent).
+- **Mutating directly** — you can't. Every fix is a queued TODO or an appended attribute block.
+- **Skipping the daily-note log** — it's the only audit trail.

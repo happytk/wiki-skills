@@ -1,141 +1,143 @@
 ---
 name: wiki-init
-description: Use when bootstrapping a new personal wiki for any knowledge domain — research, codebase documentation, reading notes, competitive analysis, or any long-term knowledge accumulation project.
+description: Use when bootstrapping a new personal wiki for any knowledge domain — research, codebase documentation, reading notes, competitive analysis, or any long-term knowledge accumulation project. Targets a Roam Research graph via the roam-mcp MCP server.
 ---
 
 # Wiki Init
 
-Bootstrap a new LLM-maintained wiki at a user-specified path.
+Bootstrap an LLM-maintained wiki inside a Roam Research graph using the [roam-mcp](https://github.com/happytk/roam-mcp) MCP server.
 
 ## Pre-flight
 
-Check whether a `SCHEMA.md` already exists nearby. If yes, ask the user if they want to reinitialize or just continue with the existing wiki.
+1. **Verify roam-mcp is connected.** Call `roam_find_pages_modified_today` once. If it errors, stop and tell the user to install/configure roam-mcp:
+   - `ROAM_API_TOKEN` (must start with `roam-graph-token-`)
+   - `ROAM_GRAPH_NAME` (exact case from the URL, e.g. `roamresearch.com/#/app/<graph-name>`)
+
+2. **Check for an existing wiki.** Call `roam_fetch_page_by_title("Wiki Schema")`. If it returns a populated tree, ask whether to reinitialize (which will append a new schema block — there is no delete) or just continue with the existing wiki.
 
 ## Process
 
 ### 1. Gather configuration (one question at a time)
 
 Ask:
-1. **Where should the wiki live?** (absolute path, e.g. `~/wikis/ml-research`)
-2. **What is the domain/purpose?** (one sentence)
-3. **What types of sources will you add?** (papers, URLs, code files, transcripts, etc.)
-4. **What categories should `index.md` use?**
+1. **What is the domain/purpose?** (one sentence)
+2. **What types of sources will you add?** (papers, URLs, code files, transcripts, etc.)
+3. **What categories should `[[Wiki Index]]` use?**
    - Research default: `Sources | Entities | Concepts | Analyses`
    - Codebase default: `Modules | APIs | Decisions | Flows` — see `codebase.md` in this skill's directory for detailed codebase guidance
    - Or specify custom
+4. **Where should binary/oversized source files live on disk?** (absolute path, e.g. `~/wikis/ml-research/raw`) — text-extractable sources will be uploaded directly into Roam blocks; this folder is the fallback for PDFs, audio, datasets, etc.
 
-### 2. Create directory structure
+### 2. Create the local `raw/` directory
+
+`mkdir -p <user-supplied path>`. Skills will copy binary sources here and cite them via the `Source::` attribute on Roam pages.
+
+### 3. Create the canonical Roam pages
+
+For each of `Wiki Schema`, `Wiki Index`, `Wiki Overview`:
+
+1. `roam_fetch_page_by_title(<title>)` — if it already has children, skip the create.
+2. Otherwise `roam_create_page(<title>)`.
+3. Populate via `roam_create_block` (use `children` to create the section tree in one call where possible). Capture the returned uids if you need them later.
+
+**Convention notes for every page you create:**
+
+- Roam has no YAML frontmatter. Page metadata lives as **flat top-level attribute blocks** of the form `Key:: value`. Roam indexes these regardless of depth, but flat top-level blocks show up in the right-sidebar attribute table.
+- One idea per block. Never use `-` bullets or newlines inside a single block string to fake hierarchy. Use the `children` argument or chain via `parent_uid`.
+- Tag write operations with a wiki namespace tag (`#wiki-meta`, `#wiki-source`, `#wiki-page`, `#wiki-entity`, `#wiki-analysis`, `#wiki-change-request`) so the auto-injected `#ai` is not the only filter available.
+
+### 4. `[[Wiki Schema]]` content
+
+Top-level blocks:
 
 ```
-<wiki-root>/
-├── SCHEMA.md         ← conventions + absolute path (how other skills find the wiki)
-├── raw/              ← immutable source documents (you add these, LLM never modifies)
-├── wiki/
-│   ├── index.md      ← content catalog: every page, one-line summary, by category
-│   ├── log.md        ← append-only operation log
-│   ├── overview.md   ← evolving synthesis of everything known
-│   └── pages/        ← all wiki pages, flat, slug-named (NO subdirectories)
-└── assets/           ← downloaded images, PDFs, attachments
+Type:: #wiki-meta
+Domain:: <user's domain description>
+Source types:: <comma-separated>
+Raw path:: <absolute local path to raw/ directory>
+Created:: <today in ordinal format, e.g. April 25th, 2026>
 ```
 
-**Critical:** `wiki/pages/` is flat. All pages live here as `<slug>.md`. No subdirectories. Slugs are lowercase, hyphen-separated.
+Then a child tree:
 
-### 3. Write `SCHEMA.md`
+```
+Conventions
+  Page references use [[Page Title]] (Roam-native; no slug munging)
+  Block references use ((9-char-uid)). Embed inline excerpts with {{embed: ((uid))}}
+  Tags: #tag and [[tag]] are equivalent; both produce :block/refs
+  Each idea is its own block. Never simulate sub-bullets inside one block string
+  Page metadata is a set of flat top-level attribute blocks (Key:: value)
+  Required attributes on every wiki page: Type::, Updated::
+  Daily-note titles MUST use the ordinal date format (April 25th, 2026)
 
-```markdown
-# Wiki Schema
+Operation log
+  Logs are appended to today's daily note as blocks tagged #wiki-log
+  Ops also carry a sub-tag: #wiki-log #ingest, #wiki-log #query, #wiki-log #lint, #wiki-log #update
+  Recall recent ops via roam_search_for_tag("wiki-log")
 
-## Identity
-- **Path:** <absolute path to wiki-root>
-- **Domain:** <user's domain description>
-- **Source types:** <list>
-- **Created:** <YYYY-MM-DD>
+Mutation policy
+  roam-mcp exposes no update or delete tool — wiki content is append-only via this plugin
+  wiki-update proposes changes as {{[[TODO]]}} Revise: ... blocks tagged #wiki-change-request
+  Apply approved changes manually in the Roam UI, then mark the TODO done
+  roam_search_by_status("TODO") surfaces all pending change requests
 
-## Page Frontmatter
-Every wiki page must start with:
----
-title: <page title>
-tags: [tag1, tag2]
-sources: [source-slug1]
-updated: YYYY-MM-DD
----
-
-## Cross-References
-Use `[[slug]]` where slug = filename without `.md`.
-Example: `[[transformer-architecture]]` → `wiki/pages/transformer-architecture.md`
-
-## Log Entry Format
-## [YYYY-MM-DD] <operation> | <title>
-Operations: init, ingest, query, update, lint
-
-## Index Categories
-<one per line, matching the user's chosen taxonomy>
-
-## Conventions
-- raw/ is immutable — skills never modify it
-- log.md is append-only — never rewritten, only appended
-- index.md is updated on every operation that adds or changes pages
-- All pages live flat in wiki/pages/ — no subdirectories
-- overview.md reflects the current synthesis across all sources
-<if codebase domain>
-- README boundary: wiki pages must not duplicate README content. Extract structural signals; link to the README for operational content (setup, contributing, running). When ingesting any README, also evaluate it for gaps and suggest edits.
-</if>
+Index categories
+  <one block per category the user chose>
 ```
 
-### 4. Write `wiki/index.md`
+If the domain is a codebase, append a child block that mirrors the README-vs-wiki rule from `codebase.md`.
 
-```markdown
-# Wiki Index — <domain>
+### 5. `[[Wiki Index]]` content
 
-<for each category>
-### <Category Name>
-<!-- entries added by wiki-ingest -->
+Keep the index shallow — `roam_fetch_page_by_title` truncates beyond 3 levels. Layout:
+
+```
+Type:: #wiki-meta
+Updated:: <today>
+
+<Category 1>
+  (entries appended here by wiki-ingest as child blocks: [[Page Title]] — one-liner _(ingested April 25th, 2026)_)
+<Category 2>
+  ...
+Maintenance
+  (lint reports linked here)
 ```
 
-### 5. Write `wiki/log.md`
+Each category lives at depth 1; page entries land at depth 2.
 
-```markdown
-# Wiki Log
+### 6. `[[Wiki Overview]]` content
 
-Append-only. Format: `## [YYYY-MM-DD] <operation> | <title>`
-Recent entries: `grep "^## \[" log.md | tail -10`
+```
+Type:: #wiki-meta
+Updated:: <today>
 
----
+Current Understanding
+  No sources ingested yet.
 
-## [<today>] init | <domain>
+Open Questions
+  Add questions here as they arise.
+
+Key Entities / Concepts
+  Populated as pages are created.
 ```
 
-### 6. Write `wiki/overview.md`
+### 7. Log the init operation
 
-```markdown
----
-title: Overview
-tags: [overview, synthesis]
-sources: []
-updated: <today>
----
+Append a block to today's daily note (call `roam_create_block` with NO `page` arg — defaults to today's daily note). Use the ordinal date format if you need to reference the daily note explicitly.
 
-# <Domain> — Overview
-
-> Evolving synthesis of everything in the wiki. Updated by wiki-ingest when sources shift the understanding.
-
-## Current Understanding
-
-*No sources ingested yet.*
-
-## Open Questions
-
-*Add questions here as they arise.*
-
-## Key Entities / Concepts
-
-*Populated as pages are created.*
+```
+[[Wiki Schema]] init | <domain> #wiki-log #wiki-init
+  Categories:: <comma-separated>
+  Raw path:: <path>
 ```
 
-### 7. Confirm
+### 8. Confirm
 
 Tell the user:
-- Wiki initialized at `<path>`
-- Add sources to `raw/` manually, or run `wiki-ingest` directly with a URL or file path
+- Wiki initialized in Roam graph `<graph name>`
+- Canonical pages: `[[Wiki Schema]]`, `[[Wiki Index]]`, `[[Wiki Overview]]`
+- Local raw directory: `<path>` (binary/oversized sources go here; text-extractable sources will be uploaded into Roam blocks by `wiki-ingest`)
+- Add sources by running `wiki-ingest` with a URL, file path, or pasted text
 - Run `wiki-lint` periodically to keep the wiki healthy
-- `SCHEMA.md` is how all other skills locate this wiki — do not move or delete it
+- Every block this plugin writes is auto-tagged `#ai` by roam-mcp; filter on `#wiki-source`, `#wiki-entity`, etc. for wiki-specific views
+- Mutations are append-only — `wiki-update` queues TODO blocks for you to apply in the Roam UI
