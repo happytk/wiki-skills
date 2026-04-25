@@ -71,6 +71,19 @@ Updated:: April 25th, 2026
 
 `wiki-query` and `wiki-update` use `((uid))` aggressively so every claim traces back to source text in `Raw Text::`.
 
+### Outliner discipline
+
+Every skill writes Roam blocks **one idea per block**. Multi-value attributes are parent attribute blocks with one child block per value:
+
+```
+Sources::
+  [[Source A]]
+  [[Source B]]
+  [[Source C]]
+```
+
+…not `Sources:: [[a]], [[b]], [[c]]` packed into a single block string. The same rule governs `Pages updated::`, `Backlinks added on::`, `Tags::` (when more than 2-3), `Categories::`, and any other multi-value attribute. Structured payloads (`Reason: …; Source: …`) likewise become a parent block with `Reason::` and `Source::` children. This is what lets Roam's outliner, attribute table, and ref index actually do their job.
+
 ### Typical Workflow
 
 ```

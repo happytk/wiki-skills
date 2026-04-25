@@ -104,14 +104,22 @@ You may also append to `Open Questions` directly if the change raises a new ques
 
 ### 8. Append to today's daily note
 
-Always — do not ask permission, do not skip:
+Always — do not ask permission, do not skip. Multi-value lists are parent + children (one block per page); the root block string holds only a short headline, not a comma-joined list.
 
 ```
-[[Wiki Schema]] update | <list of pages with queued changes> #wiki-log #wiki-update
+[[Wiki Schema]] update | <one-line headline> #wiki-log #wiki-update
   Reason:: <brief description of what changed and why>
   Source:: <URL or [[Page]] or description>
   Change requests queued:: <count>
   Directly appended:: <count, if any>
+  Pages with queued changes::
+    [[Page A]]
+    [[Page B]]
+  Pages with appended additions::
+    [[Page C]]
+  Downstream pages flagged::
+    [[Page D]]
+    [[Page E]]
 ```
 
 ### 9. Report to user
@@ -130,3 +138,4 @@ Remind the user: **apply queued changes in the Roam UI**, then mark each `{{[[TO
 - **Skipping the daily-note log** — the daily-note log is the only audit trail.
 - **Batch-queuing without per-change confirmation** — show each diff individually. The user may accept some changes and reject others.
 - **Trying to delete content via `roam_create_block`** — there is no delete. Mark obsolete content with `Status:: obsolete` (an attribute block) and reference the corrected page.
+- **Comma-joining multi-page lists** — `Pages with queued changes:: [[a]], [[b]]` defeats the outliner. Use a parent attribute block with one child per page.

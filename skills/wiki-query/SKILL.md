@@ -69,22 +69,26 @@ If **yes:**
 
 1. `roam_fetch_page_by_title(<title>)` — confirm it doesn't already exist with content.
 2. `roam_create_page(<title>)`.
-3. Build the page with attribute blocks at depth 0 and section blocks below:
+3. Build the page with attribute blocks at depth 0 and section blocks below. Multi-value attributes use parent + children; one idea per block.
 
    ```
    Type:: #wiki-analysis
    Question:: <verbatim user question>
-   Sources:: [[<page1>]], [[<page2>]], …
+   Sources::
+     [[<page1>]]
+     [[<page2>]]
+     ...
    Updated:: <today, ordinal>
 
    Answer
-     <first paragraph block, with ((uid)) and [[Page]] citations>
-     <second paragraph block, …>
-     {{embed: ((uid-of-key-quote))}}
+     <paragraph 1 — one block, with ((uid)) and [[Page]] citations>
+     <paragraph 2 — one block>
+     {{embed: ((uid-of-key-quote))}}     (its own block)
 
    Open Follow-ups
-     <follow-up question>
-     <suggested source to ingest>
+     <follow-up question 1 — one block>
+     <follow-up question 2 — one block>
+     <suggested source to ingest — one block>
    ```
 
    The `Answer` blocks should re-use the same `((uid))`s the synthesis cited so the analysis stays auditable to source.
@@ -95,12 +99,16 @@ If **yes:**
    [[<title>]] — <one-line summary> _(query <today>)_
    ```
 
-5. Append to today's daily note:
+5. Append to today's daily note. Distinct facts are sibling child blocks — never packed into a single comma-joined string.
 
    ```
    [[Wiki Schema]] query | <one-line question summary> #wiki-log #wiki-query
      Filed as:: [[<title>]]
-     Citations:: <count of [[Page]] refs>, <count of ((uid)) refs>
+     Page citations:: <count of [[Page]] refs>
+     Block citations:: <count of ((uid)) refs>
+     Pages cited::
+       [[<page1>]]
+       [[<page2>]]
    ```
 
 If **no:**
@@ -127,3 +135,4 @@ Append to today's daily note:
 - **`[[Page]]`-only citations** — a query response without `((uid))` citations is weak when source text exists in `Raw Text::`. Reach for the original.
 - **Forgetting to log** — every query operation must land in today's daily note tagged `#wiki-log #wiki-query`, even when the answer is not filed.
 - **Going deeper than two ref hops** — explodes context for marginal gain. Stop and ask the user if a deeper trace is needed.
+- **Comma-joining cited pages** — `Sources:: [[a]], [[b]], [[c]]` defeats the outliner. Use parent + child blocks.
