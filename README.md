@@ -64,6 +64,48 @@ Replace `<your-account>` with your Cloudflare subdomain.
 
 In a Claude Code session, ask Claude to call `roam_find_pages_modified_today`. If it returns a list (possibly empty), you're ready to run `wiki-init`. If it errors, re-check the `/check` endpoint and the URL in your MCP config.
 
+### Per-project Roam graph (header override)
+
+`roam-mcp` reads two HTTP headers per request that override the Worker's baked-in defaults:
+
+| Header | Overrides |
+| --- | --- |
+| `X-Roam-Graph` | `ROAM_GRAPH_NAME` from `wrangler.toml` |
+| `X-Roam-Token` | `ROAM_API_TOKEN` from the Worker secret |
+
+This lets you register **one** roam-mcp endpoint at user scope and target a different Roam graph per project — no redeploy, no second MCP registration. In each project's `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "roam": {
+      "type": "http",
+      "url": "https://roam-mcp.<your-account>.workers.dev/mcp",
+      "headers": {
+        "X-Roam-Graph": "<project-graph>",
+        "X-Roam-Token": "roam-graph-token-xxxxxxxxxxxx"
+      }
+    }
+  }
+}
+```
+
+You can also override at user scope by editing `~/.claude.json` directly — add the same `headers` block to the `roam` (or `roam-local`) MCP entry. Without these headers, the Worker falls back to the values baked in at deploy time.
+
+### Local development mode (optional)
+
+To run roam-mcp on your own machine instead of (or alongside) a deployed Worker:
+
+```bash
+git clone https://github.com/happytk/roam-mcp.git
+cd roam-mcp
+# wrangler.toml: set ROAM_GRAPH_NAME under [vars]
+echo "ROAM_API_TOKEN=roam-graph-token-..." > .dev.vars
+npx wrangler dev
+```
+
+The local server listens on `http://localhost:8787/mcp`. Use the same `.mcp.json` shape from step 3 with that URL. The header override above works identically against the local server, which is convenient for switching test graphs without restarting `wrangler dev`.
+
 ### Alternative MCP servers / v1 fallback
 
 If you don't want to deploy a Cloudflare Worker, you have two paths:
