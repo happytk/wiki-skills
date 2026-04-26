@@ -73,6 +73,7 @@ In a Claude Code session, ask Claude to call `roam_find_pages_modified_today`. I
 | `X-Roam-Graph` | Override `ROAM_GRAPH_NAME` from `wrangler.toml` | the Worker's baked-in graph |
 | `X-Roam-Token` | Override `ROAM_API_TOKEN` from the Worker secret | the Worker's baked-in token |
 | `X-Roam-Ai-Tag` | Toggle the auto `#ai` tag on root blocks of `roam_create_page`, `roam_create_block`, `roam_add_todo`. Accepts `true`/`false`, `1`/`0`, `on`/`off`, `yes`/`no` (case-insensitive) | `true` (auto-tag enabled) |
+| `X-Roam-Mutate` | Expose the 5 mutation tools (`roam_update_block`, `roam_delete_block`, `roam_move_block`, `roam_rename_page`, `roam_delete_page`) on this MCP entry. When unset, the tools are hidden and `wiki-update` / `wiki-lint` fall back to a `#wiki-change-request` TODO queue. | unset (mutation hidden) |
 
 The first two let you register **one** roam-mcp endpoint at user scope and target a different Roam graph per project — no redeploy, no second MCP registration. The third lets you turn off the `#ai` noise per project (or for one specific MCP entry) without forking roam-mcp; see also [Tag conventions](#tag-conventions). In each project's `.mcp.json`:
 
@@ -85,7 +86,8 @@ The first two let you register **one** roam-mcp endpoint at user scope and targe
       "headers": {
         "X-Roam-Graph": "<project-graph>",
         "X-Roam-Token": "roam-graph-token-xxxxxxxxxxxx",
-        "X-Roam-Ai-Tag": "false"
+        "X-Roam-Ai-Tag": "false",
+        "X-Roam-Mutate": "true"
       }
     }
   }
@@ -189,7 +191,7 @@ If you don't want to deploy a Cloudflare Worker, you have two paths:
 | `wiki-ingest` | Add a source (paper, URL, file, transcript, …). Three modes: ingest now, queue for later (`#wiki-ingest-queue`), or process the queue. Uploads extracted text paragraph-per-block under `Raw Text::`, creates entity/concept pages, runs the backlink audit. |
 | `wiki-query` | Ask a question — answers cite via `[[Page]]` and `((uid))` block refs into `Raw Text::` excerpts; offers to queue gap-driven follow-ups for ingest. |
 | `wiki-lint` | Health audit via Datalog: orphans, stale claims, broken refs, missing pages, contradictions, and ingest-queue progress. |
-| `wiki-update` | Queue revisions as `{{[[TODO]]}} #wiki-change-request` blocks (roam-mcp has no update/delete API; you apply changes manually in Roam). |
+| `wiki-update` | Apply revisions in place via `roam_update_block` / `roam_delete_block` / `roam_move_block` / `roam_rename_page` / `roam_delete_page` once `X-Roam-Mutate: true` is set. Without it, falls back to queuing `{{[[TODO]]}} #wiki-change-request` blocks for manual application. |
 
 ## How It Works
 
@@ -285,26 +287,32 @@ Sources::
 wiki-init          → bootstrap a new wiki
 wiki-ingest        → add a source (Mode A) / queue for later (Mode B) / process the queue (Mode C)
 wiki-query         → ask questions; cite ((uid)); offer to queue gap follow-ups
-wiki-lint          → periodic health check (every 5-10 ingests); reports ingest-queue progress
-wiki-update        → queue revisions as #wiki-change-request TODOs
+wiki-lint          → periodic health check (every 5-10 ingests); cleans up in place when X-Roam-Mutate is set; reports ingest-queue progress
+wiki-update        → in-place edits (X-Roam-Mutate: true) or fallback to #wiki-change-request TODO queue
 ```
 
 ### Key Behaviors
 
 - **`wiki-ingest`** surfaces key takeaways and asks what to emphasize *before* writing anything. Extracts source text into paragraph-per-block units under `Raw Text::` so every excerpt has a stable `((uid))`. After creating a source page, it runs a backlink audit using the set-difference of `roam_search_for_tag` and `roam_search_by_text` to add explicit `[[entity]]` references where text mentions exist without links.
 - **`wiki-query`** always reads the wiki (never answers from memory). Cites with both `[[Page]]` and `((uid))`, and offers to file the answer back as a `#wiki-analysis` page that re-uses the same uids.
-- **`wiki-lint`** uses Datalog queries (via `roam_datomic_query`) for orphans, stale claims, and missing-page detection. Writes a `[[Lint <date>]]` page and offers fixes that queue as `#wiki-change-request` TODOs.
-- **`wiki-update`** displays current/proposed/reason/source diffs per change, queues each as a `{{[[TODO]]}} … #wiki-change-request` block under the affected page, sweeps downstream pages for related claims, and logs unconditionally.
+- **`wiki-lint`** uses Datalog queries (via `roam_datomic_query`) for orphans, stale claims, and missing-page detection. Writes a `[[Lint <date>]]` page. With `X-Roam-Mutate: true`, offers concrete in-place fixes (delete `undefined` blocks, collapse duplicate legacy `Updated::` blocks, rename stub pages to canonical ones, move stranded blocks, delete orphans on twice-confirm). Without it, queues fixes as `#wiki-change-request` TODOs.
+- **`wiki-update`** displays current/proposed/reason/source diffs per change. With `X-Roam-Mutate: true` enabled, applies each confirmed change in place via `roam_update_block` / `roam_delete_block` / `roam_move_block` / `roam_rename_page` / `roam_delete_page`. Without the header, falls back to queuing `{{[[TODO]]}} … #wiki-change-request` blocks for manual application. Always sweeps downstream pages for related claims and logs unconditionally.
 
 ### Mutation policy (read this once)
 
-`roam-mcp` exposes only read and create tools — no update, no delete. This plugin treats wiki content as **append-only**:
+`roam-mcp` separates read/create tools from mutation tools. Mutation is **opt-in via the `X-Roam-Mutate: true` header** on your MCP entry — set it once and the five mutation tools (`roam_update_block`, `roam_delete_block`, `roam_move_block`, `roam_rename_page`, `roam_delete_page`) become available.
 
-- New blocks are appended.
-- Edits are *queued* as `{{[[TODO]]}} Revise: … #wiki-change-request` blocks under the affected page. You apply them manually in the Roam UI, then mark the TODO done.
+**Mutation enabled** (`X-Roam-Mutate: true`):
+- `wiki-update` applies edits in place per-confirmation. Page rename auto-rewires backlinks via Roam's ref index.
+- `wiki-lint` cleans up directly: deletes `undefined` blocks and duplicate legacy `Updated::` blocks, moves stranded blocks to the correct section, renames stub pages into canonical ones, deletes orphans (with twice-confirm).
+- `wiki-ingest` re-ingest can refresh existing `Raw Text::` blocks via `roam_update_block` instead of appending superseded copies.
+- `wiki-update` and `wiki-lint` *probe* at the start of every run — if the mutation tools aren't visible despite the header (e.g., outdated roam-mcp deployment), they tell you so and fall through to the queue path.
+
+**Mutation disabled** (header unset, default):
+- All edits become `{{[[TODO]]}} Revise: … #wiki-change-request` blocks under the affected page. You apply them manually in Roam UI, then mark the TODO done.
 - `roam_search_by_status("TODO")` filtered by `#wiki-change-request` lists every pending change.
 
-If a future MCP server exposes write transactions, `wiki-update` should be revised to apply changes directly.
+**Destructive operation safety:** `roam_delete_block` cascades through descendants; `roam_delete_page` wipes the whole page. The skills are required to show child counts and inbound-ref counts before destructive calls and to confirm twice (or three times when the blast radius is large). When in doubt, prefer `Status:: orphan` annotation over deletion.
 
 ### Tag conventions
 

@@ -129,9 +129,17 @@ Tags::
 2. **Raw Text uploading** — split the source into paragraph-sized units (or logical units for code/transcripts: function, scene, speaker turn). Pass them as the `children` of the `Raw Text` block in a single `roam_create_block` call. Capture the `created_uids` from the response. These uids are the citation handles for the rest of the wiki.
 3. Write the `Summary` blocks **after** `Raw Text` is uploaded so summary paragraphs can `((uid))`-cite the original lines. Use `{{embed: ((uid))}}` when the original phrasing carries weight (a quotable claim, a precise number).
 
-**Pre-write validation (mandatory).** Before EVERY `roam_create_block` / `roam_create_page` / `roam_add_todo` call, verify each `content` field — including every `content` inside the `children` tree — is a non-empty string. If a value is `undefined`, `null`, an empty string, or the literal string `"undefined"`/`"null"`, **drop that entry** (don't send it) and surface the gap to the user before proceeding. The auto `#ai` suffix concat means an undefined value renders as a literal `undefined #ai` block in Roam, which is hard to clean up because there is no delete API.
+**Pre-write validation (mandatory).** Before EVERY `roam_create_block` / `roam_create_page` / `roam_add_todo` call, verify each `content` field — including every `content` inside the `children` tree — is a non-empty string. If a value is `undefined`, `null`, an empty string, or the literal string `"undefined"`/`"null"`, **drop that entry** (don't send it) and surface the gap to the user before proceeding. The auto `#ai` suffix concat means an undefined value renders as a literal `undefined #ai` block in Roam — `roam_delete_block` can clean it up but only when `X-Roam-Mutate: true`, so don't write it in the first place.
 
-**Idempotency.** If you're re-ingesting an updated source, fetch the existing source page first and string-match children before appending — match the first ~80 chars of each Raw Text paragraph to skip already-uploaded content.
+**Idempotency on re-ingest.** If you're re-ingesting an updated source, fetch the existing source page first and walk the existing `Raw Text::` children:
+
+1. Match each new paragraph against existing children by the first ~80 chars.
+2. **Identical match** → skip; reuse the existing `((uid))` (any wiki page that already cites it stays valid).
+3. **Existing block, slightly changed source text** (same paragraph, edited wording) → if `X-Roam-Mutate: true` is enabled, call `roam_update_block(uid=<existing>, content=<new>)` to keep the citation stable. If mutation is disabled, append the new version as a sibling and tag it `Supersedes:: ((<old-uid>))` so readers know which is current.
+4. **New paragraph not in the existing tree** → append as a new child of `Raw Text::` (single `roam_create_block` call with `children=[…]` for the new paragraphs only).
+5. **Existing block whose source paragraph was deleted upstream** → if mutation is enabled, `roam_delete_block(uid=<existing>)` only when no other wiki page cites that uid (run `roam_search_for_tag(<source title>)` and check). When uncertain, leave it and append a new `Sources note:: this paragraph removed in <date> revision` child block instead.
+
+The mutation calls require the `X-Roam-Mutate: true` header on your MCP entry; without it, fall back to the v2.0 append-only behavior (rule 4 only) and tell the user that re-ingest could not refresh existing blocks in place.
 
 ### 7. Update entity and concept pages
 

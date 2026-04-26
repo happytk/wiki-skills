@@ -200,28 +200,35 @@ Append to `[[Wiki Index]]` under a `Maintenance` category (create the category i
 
 ### 4. Offer concrete fixes
 
-For each fixable category, offer to queue a `#wiki-change-request` TODO under the affected page (since direct mutation isn't possible). Show the exact block content before queuing.
+Mutation availability decides the fix path. **Probe first** (same as wiki-update — try a no-op `roam_update_block` or check the tool list for `roam_*_block` mutation tools). Then for each fixable category:
 
-For example, for a missing cross-reference between `[[Page A]]` and `[[Page B]]`:
+**With mutation enabled (`X-Roam-Mutate: true`):** apply the fix in place after per-fix confirmation. Show the exact `roam_*` call before executing.
+
+| Lint finding | Fix call |
+| --- | --- |
+| Missing cross-reference between `[[A]]` and `[[B]]` | `roam_create_block(content="[[B]]", page="A", parent_uid=<section uid>)` (additive — no mutation needed) |
+| Duplicate legacy `Updated::` blocks (carry-over from v2.0 wikis) | Keep one block, `roam_delete_block` the rest. Confirm count before deleting. |
+| `undefined` blocks (pre-guardrail residue) | `roam_delete_block` per offending uid. These cannot have meaningful descendants — safe to cascade. |
+| Stale claim with a clear correction (e.g. "GPT-4" → "GPT-5" sourced) | `roam_update_block(uid, new_content)`. Always cite source via the wiki-update flow — consider routing to wiki-update for richer per-change confirmation. |
+| Orphan page with no inbound refs | Three choices: (a) add `Status:: orphan` attribute via `roam_create_block` (keep, mark for review), (b) `roam_rename_page` to merge into a related page (then user fills in via wiki-ingest), or (c) `roam_delete_page(title=<orphan>)` to remove entirely (destructive — confirm twice; never use on pages with any inbound refs). |
+| Block in wrong section | `roam_move_block(uid, parent_uid=<correct section uid>, order=<n>)`. |
+| Pages referenced but not created | `roam_create_page(<title>)` + a stub Type:: attribute. The user can populate later via wiki-ingest. |
+| Stub page that should be merged into another | `roam_rename_page(title=<stub>, new_title=<canonical>)` consolidates into the canonical page (Roam merges blocks). Confirm and surface inbound-ref count from `roam_search_for_tag` first. |
+
+**Without mutation (legacy queue mode):** queue each fix as a `{{[[TODO]]}} … #wiki-change-request` block under the affected page (the v2.0 behavior). Tell the user clearly that mutation was unavailable and recommend enabling `X-Roam-Mutate: true`.
+
+Examples (legacy mode):
 
 ```
 {{[[TODO]]}} Add [[Page B]] reference under <section name> #wiki-change-request
   Source:: lint report [[Lint <ordinal-date>]]
 ```
 
-`roam_create_block(content=<above>, page="Page A")`. Apply only after per-fix confirmation.
-
-For orphan pages, propose tagging:
-
-```
-Status:: orphan
-```
-
-(an attribute block, not a TODO — it's metadata, not an action).
+For orphan pages in legacy mode, propose `Status:: orphan` (attribute block, not a TODO — it's passive metadata).
 
 ### 5. Append to today's daily note
 
-Always — do not ask permission. Counts and queued-fix references are siblings; never comma-joined.
+Always — do not ask permission. Counts and applied-fix references are siblings; never comma-joined.
 
 ```
 [[Wiki Schema]] lint #wiki-log #wiki-lint
@@ -229,9 +236,13 @@ Always — do not ask permission. Counts and queued-fix references are siblings;
   🔴 Errors:: <N>
   🟡 Warnings:: <N>
   🔵 Info:: <N>
-  Fixes queued::
+  Fixes applied::
     [[Page A]] — added missing cross-reference
-    [[Page B]] — flagged Status:: orphan
+    [[Page B]] — deleted 3 duplicate Updated:: blocks
+    [[Page C]] — moved <N> stranded blocks to correct section
+    (or one block: "none")
+  Fixes queued (legacy mode)::
+    (only when mutation was unavailable; one block per queued TODO)
     (or one block: "none")
   Ingest queue::
     Pending:: <N>
@@ -241,6 +252,7 @@ Always — do not ask permission. Counts and queued-fix references are siblings;
 ## Common Mistakes
 
 - **Trusting Datalog without sanity-checking** — verify each query against 1-2 known cases on the first lint run, especially the orphan query (the "exclude daily-note pages" predicate is locale-dependent).
-- **Mutating directly** — you can't. Every fix is a queued TODO or an appended attribute block.
+- **Skipping the mutation probe** — without checking, you may queue TODOs even though `roam_update_block` etc. would work. Always probe at the start of a run.
+- **`roam_delete_block` without confirming descendants** — deletes cascade. For any block with children, show the child count and confirm twice before calling.
 - **Skipping the daily-note log** — it's the only audit trail.
 - **Comma-joining offenders inside one block** — `[[a]], [[b]] missing Type::` defeats the outliner. One offender per block, with structured children for the failure details.

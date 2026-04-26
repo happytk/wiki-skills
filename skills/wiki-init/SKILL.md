@@ -94,15 +94,23 @@ Operation log
   Recall recent ops via roam_search_for_tag("wiki-log")
 
 Mutation policy
-  roam-mcp exposes no update or delete tool — wiki content is append-only via this plugin
-  wiki-update proposes changes as {{[[TODO]]}} Revise: ... blocks tagged #wiki-change-request
-  Apply approved changes manually in the Roam UI, then mark the TODO done
-  roam_search_by_status("TODO") surfaces all pending TODOs
+  roam-mcp exposes 5 mutation tools, gated by the X-Roam-Mutate: true header on the MCP entry:
+    roam_update_block(uid, content)              replace block string
+    roam_delete_block(uid)                       delete block + descendants (cascades)
+    roam_move_block(uid, parent_uid|page, order) relocate block
+    roam_rename_page(title|uid, new_title)       rename page; Roam refs auto-rewire
+    roam_delete_page(title|uid)                  delete entire page (DESTRUCTIVE)
+  When the header is set, wiki-update applies edits in place per-confirmation
+  When the header is not set, wiki-update falls back to legacy queue mode:
+    every change becomes a {{[[TODO]]}} Revise: ... block tagged #wiki-change-request
+    user applies the edits manually in Roam UI, then marks the TODO done
+  Probe at the start of every wiki-update / wiki-lint run to choose the path
+  roam_search_by_status("TODO") surfaces pending change requests in legacy mode
 
 TODO sub-types (filter by tag)
   #wiki-change-request
-    Source:: wiki-update or wiki-lint
-    Action:: apply edit in Roam UI, then mark done
+    Source:: wiki-update or wiki-lint, only emitted in legacy queue mode (no X-Roam-Mutate)
+    Action:: apply edit in Roam UI, then mark done — or enable X-Roam-Mutate and re-run
   #wiki-ingest-queue
     Source:: wiki-ingest follow-ups, wiki-query gap offers, or user manually
     Action:: run wiki-ingest with no source → Mode C (queue runner)
