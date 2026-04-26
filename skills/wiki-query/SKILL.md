@@ -78,7 +78,6 @@ If **yes:**
      [[<page1>]]
      [[<page2>]]
      ...
-   Updated:: <today, ordinal>
 
    Answer
      <paragraph 1 — one block, with ((uid)) and [[Page]] citations>

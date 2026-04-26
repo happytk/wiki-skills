@@ -252,10 +252,11 @@ Type:: #wiki-source
 Source:: https://arxiv.org/abs/1706.03762
 Source kind:: paper
 Tags:: #ml #transformer
-Updated:: April 25th, 2026
 ```
 
 …followed by section blocks (`Summary`, `Key Takeaways`, `Entities & Concepts`, `Raw Text`, …) as siblings.
+
+Last-edit time is **not** written as a `Updated::` block. Roam tracks `:edit/time` automatically on every block (visible in the right-sidebar block menu and queryable via `roam_datomic_query`); writing manual `Updated::` blocks just produces accumulating noise because there is no mutate API.
 
 ### Cross-references
 

@@ -84,7 +84,8 @@ Conventions
         [[Entity 2]]
     A short single ref or 1-3 short tags may stay inline (Tags:: #ml #transformer)
   Page metadata is a set of flat top-level attribute blocks (Key:: value)
-  Required attributes on every wiki page: Type::, Updated::
+  Required attribute on every wiki page: Type::
+  Last-edited time is tracked automatically by Roam (:edit/time on every block) — DO NOT write Updated:: blocks; they accumulate without a mutate API and Roam already exposes the canonical edit time
   Daily-note titles MUST use the ordinal date format (April 25th, 2026)
 
 Operation log
@@ -135,7 +136,6 @@ Keep the index shallow — `roam_fetch_page_by_title` truncates beyond 3 levels.
 
 ```
 Type:: #wiki-meta
-Updated:: <today>
 
 <Category 1>
   (entries appended here by wiki-ingest as child blocks: [[Page Title]] — one-liner _(ingested April 25th, 2026)_)
@@ -151,7 +151,6 @@ Each category lives at depth 1; page entries land at depth 2.
 
 ```
 Type:: #wiki-meta
-Updated:: <today>
 
 Current Understanding
   No sources ingested yet.

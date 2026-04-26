@@ -91,7 +91,6 @@ Category:: Module | API | Decision | Flow
 Sources::
   [[Source Page Title 1]]
   [[Source Page Title 2]]
-Updated:: April 25th, 2026
 Tags:: #auth #postgres        (1-3 short tags inline; otherwise expand to parent + children)
 ```
 

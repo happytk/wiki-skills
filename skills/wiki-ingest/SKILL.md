@@ -83,7 +83,6 @@ Type:: #wiki-source
 Source:: <URL or absolute file path under Raw path::>
 Source kind:: paper | article | transcript | code | other
 Tags:: #<topic1> #<topic2>          (1-3 short tags inline is fine; otherwise split below)
-Updated:: <today, ordinal: April 25th, 2026>
 
 Summary
   <paragraph 1 — one block>
@@ -130,13 +129,15 @@ Tags::
 2. **Raw Text uploading** — split the source into paragraph-sized units (or logical units for code/transcripts: function, scene, speaker turn). Pass them as the `children` of the `Raw Text` block in a single `roam_create_block` call. Capture the `created_uids` from the response. These uids are the citation handles for the rest of the wiki.
 3. Write the `Summary` blocks **after** `Raw Text` is uploaded so summary paragraphs can `((uid))`-cite the original lines. Use `{{embed: ((uid))}}` when the original phrasing carries weight (a quotable claim, a precise number).
 
+**Pre-write validation (mandatory).** Before EVERY `roam_create_block` / `roam_create_page` / `roam_add_todo` call, verify each `content` field — including every `content` inside the `children` tree — is a non-empty string. If a value is `undefined`, `null`, an empty string, or the literal string `"undefined"`/`"null"`, **drop that entry** (don't send it) and surface the gap to the user before proceeding. The auto `#ai` suffix concat means an undefined value renders as a literal `undefined #ai` block in Roam, which is hard to clean up because there is no delete API.
+
 **Idempotency.** If you're re-ingesting an updated source, fetch the existing source page first and string-match children before appending — match the first ~80 chars of each Raw Text paragraph to skip already-uploaded content.
 
 ### 7. Update entity and concept pages
 
 For each entity/concept this source touches:
 
-- **Page exists** (`roam_fetch_page_by_title` returns a tree): read it, add a child block under the relevant section. For `Sources::` — if it's currently a parent attribute block, append `[[<source title>]]` as a new child. If it's a single-value inline attribute, append a sibling `Sources::` block (we cannot mutate). Always append a fresh `Updated:: <today>` block at depth 0 (there is no in-place edit).
+- **Page exists** (`roam_fetch_page_by_title` returns a tree): read it, then add **only what is actually new**. For `Sources::` — if it's currently a parent attribute block, append `[[<source title>]]` as a new child of that existing parent (do NOT create another `Sources::` sibling). If it's a single-value inline attribute (legacy shape) leave it and append a new child `[[<source title>]]` to the page-level Sources:: parent if you can identify one; otherwise leave the legacy block and append the new ref under the relevant section instead. Roam tracks edit time on every block via `:edit/time` — do NOT write `Updated:: <today>` blocks.
 - **Page doesn't exist:** `roam_create_page(<entity>)`, then create attribute + section blocks. One concept per block; multi-value attributes use parent + children:
 
 ```
@@ -146,7 +147,6 @@ Sources::
 Tags::
   #<topic1>
   #<topic2>
-Updated:: <today>
 
 Description
   <paragraph 1 — one block, citing ((uid)) into Raw Text:: of the source>
@@ -193,7 +193,7 @@ Fetch `[[Wiki Overview]]`. If this source:
 - Shifts the overall understanding → append a child block under `Current Understanding` (do not delete the old one — append-only)
 - Raises a new question → append under `Open Questions`
 
-Append a fresh `Updated:: <today>` attribute block at depth 0.
+Roam tracks the page's last-edit time via `:edit/time` on the appended blocks; no manual `Updated::` block needed.
 
 ### 11. Surface follow-up suggestions and offer to queue
 
@@ -308,3 +308,6 @@ When `wiki-ingest` is invoked with no source (or `--queue`):
 - **Wrong chunking for the source kind** — pasting a transcript paragraph-per-block instead of speaker-turn-per-block, or dumping a code file as a single Raw Text block. Re-read the Source kind taxonomy before writing.
 - **Skipping follow-up queue offer** — every paper/article cites adjacent work. Surface it and let the user decide whether to queue. Otherwise the wiki stops compounding.
 - **Closing a queue item without `Ingested as::`** — every Mode C run must thread the new source page back to the queue TODO so the audit trail is intact.
+- **Sending undefined/null content to a write tool** — every block content (root and children) must be a non-empty string. Iterating over an entity/source list with empty slots produces blocks like `undefined #ai` that you cannot delete. Validate before each write call; drop missing entries and tell the user.
+- **Writing `Updated::` blocks** — Roam tracks edit time via `:edit/time` on every block, exposed in the Roam UI and via `roam_datomic_query`. Manual `Updated::` blocks accumulate (no mutate API) and add no information. Don't write them; lint reads `:edit/time` instead.
+- **Creating a new `Sources::` parent on every ingest** — when a page already has `Sources::`, append the new ref as a child of the existing parent. A second sibling `Sources::` block is the bug pattern that produces noisy duplicates.

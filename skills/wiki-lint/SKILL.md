@@ -56,20 +56,21 @@ This gives `(title, uid, edit-time)` triples for all wiki pages. Cache the set o
 
   These are the "broken links" of the Roam world. Recommend create-or-remove.
 
-- **Missing required attributes** — for each wiki page, check that `Type::` and `Updated::` blocks exist as direct children. A page missing them is malformed:
+- **Missing `Type::` attribute** — for each wiki page, check that a `Type:: #wiki-*` block exists as a direct child. A page missing it is malformed:
 
   ```clojure
   [:find ?title
    :where
    [?p :node/title ?title]
-   [?p :block/children ?c]
-   [?c :block/string ?s]
-   [(clojure.string/starts-with? ?s "Type:: #wiki-")]
-   ;; …then a not-clause for pages without an Updated:: child
+   (not-join [?p]
+     [?p :block/children ?c]
+     [?c :block/string ?s]
+     [(clojure.string/starts-with? ?s "Type:: #wiki-")])
+   ;; restrict to wiki-managed pages — join via the same Type:: query elsewhere
   ]
   ```
 
-  (Run a separate query for `Updated::` and set-difference in code.)
+  Note: `Updated::` is **not** a required attribute. Roam tracks last-edit time automatically via `:edit/time` on every block — the stale-claim check below uses that directly. Manual `Updated::` blocks were a v2.0 design that produced accumulating noise; the current spec drops them.
 
 **🟡 Warnings (should fix)**
 
@@ -122,7 +123,7 @@ Today's date in ordinal format → page title `Lint April 25th, 2026`.
 
 ```
 Type:: #wiki-meta #lint
-Updated:: <today, ordinal>
+Run date:: <today, ordinal>
 
 Summary
   🔴 Errors:: <N>
@@ -140,7 +141,6 @@ Summary
   [[Page]]
     Missing::
       Type::
-      Updated::
 
 🟡 Orphan Pages
   [[Slug]]
@@ -157,9 +157,9 @@ Summary
 
 🟡 Stale Claims
   [[Page]]
-    Last updated:: <date>
+    Last edited:: <date from :edit/time>
     Trigger:: contains "latest"
-    Fix:: re-verify and append an `Updated:: <today>` attribute block, or queue a wiki-update
+    Fix:: re-verify the claim; any corrective edit will refresh :edit/time, or queue a wiki-update
 
 🔵 Missing Concept Pages
   [[Foo]]
@@ -243,4 +243,4 @@ Always — do not ask permission. Counts and queued-fix references are siblings;
 - **Trusting Datalog without sanity-checking** — verify each query against 1-2 known cases on the first lint run, especially the orphan query (the "exclude daily-note pages" predicate is locale-dependent).
 - **Mutating directly** — you can't. Every fix is a queued TODO or an appended attribute block.
 - **Skipping the daily-note log** — it's the only audit trail.
-- **Comma-joining offenders inside one block** — `[[a]], [[b]] missing Type::, Updated::` defeats the outliner. One offender per block, with structured children for the failure details.
+- **Comma-joining offenders inside one block** — `[[a]], [[b]] missing Type::` defeats the outliner. One offender per block, with structured children for the failure details.
