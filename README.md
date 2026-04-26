@@ -6,14 +6,61 @@ Instead of RAG (re-deriving answers from raw documents every time), this system 
 
 ## Prerequisites
 
-This plugin talks to Roam through the [`roam-mcp`](https://github.com/happytk/roam-mcp) MCP server. Configure it before installing:
+This plugin talks to Roam through the [`roam-mcp`](https://github.com/happytk/roam-mcp) MCP server, which runs as a **Cloudflare Worker** (HTTP transport, JSON-RPC 2.0). Setup is two-sided: credentials live on the Worker; Claude Code only needs the Worker URL.
 
-| Variable | Purpose |
-| --- | --- |
-| `ROAM_API_TOKEN` | Roam Backend API token. Must start with `roam-graph-token-`. |
-| `ROAM_GRAPH_NAME` | Graph name as it appears in `roamresearch.com/#/app/<graph-name>`. |
+### 1. Roam credentials
 
-Then add roam-mcp to your Claude Code MCP servers list and confirm `roam_find_pages_modified_today` works before running `wiki-init`.
+| Variable | Where it goes | Notes |
+| --- | --- | --- |
+| `ROAM_API_TOKEN` | Cloudflare Worker secret (set with `wrangler secret put`) | Must start with `roam-graph-token-`. **Not** `roam-graph-local-token-`. Get it from Roam: Settings → Graph → API tokens. |
+| `ROAM_GRAPH_NAME` | `wrangler.toml` `[vars]` block on the Worker | Exact case/hyphens as it appears in `roamresearch.com/#/app/<graph-name>`. |
+
+Neither variable is set on the Claude Code side — they exist only on the Worker.
+
+### 2. Deploy the Worker
+
+```bash
+git clone https://github.com/happytk/roam-mcp.git
+cd roam-mcp
+# edit wrangler.toml: set ROAM_GRAPH_NAME under [vars]
+npx wrangler deploy
+npx wrangler secret put ROAM_API_TOKEN     # paste the token when prompted
+```
+
+Verify the Worker is healthy:
+
+```bash
+curl https://roam-mcp.<your-account>.workers.dev/check
+# → {"ok": true, "graph": "<your-graph>", "sampleCount": 1}
+```
+
+Prerequisites for this step: Node.js 18+, a Cloudflare account (free tier works).
+
+### 3. Register the Worker as an MCP server in Claude Code
+
+Pick **one** of:
+
+- **Project-shared** (`<repo>/.mcp.json`, committed so collaborators inherit it):
+  ```json
+  {
+    "mcpServers": {
+      "roam": {
+        "type": "http",
+        "url": "https://roam-mcp.<your-account>.workers.dev/mcp"
+      }
+    }
+  }
+  ```
+- **User-level** (applies to all your projects):
+  ```bash
+  claude mcp add --scope user --transport http roam https://roam-mcp.<your-account>.workers.dev/mcp
+  ```
+
+Replace `<your-account>` with your Cloudflare subdomain.
+
+### 4. Confirm the connection
+
+In a Claude Code session, ask Claude to call `roam_find_pages_modified_today`. If it returns a list (possibly empty), you're ready to run `wiki-init`. If it errors, re-check the `/check` endpoint and the URL in your MCP config.
 
 ## Installation
 
