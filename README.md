@@ -94,17 +94,76 @@ You can also override at user scope by editing `~/.claude.json` directly — add
 
 ### Local development mode (optional)
 
-To run roam-mcp on your own machine instead of (or alongside) a deployed Worker:
+Two ways to run roam-mcp on your own machine instead of (or alongside) a deployed Worker. Once `localhost:8787/mcp` is reachable, the per-project header override above works identically against it — one `roam-local` MCP entry in `~/.claude.json` can serve every project.
+
+**A. Always-on via launchd (recommended on macOS)**
+
+Set up once, then `localhost:8787/mcp` is always reachable across logins and crashes.
 
 ```bash
-git clone https://github.com/happytk/roam-mcp.git
-cd roam-mcp
+git clone https://github.com/happytk/roam-mcp.git ~/code/roam-mcp
+cd ~/code/roam-mcp
 # wrangler.toml: set ROAM_GRAPH_NAME under [vars]
 echo "ROAM_API_TOKEN=roam-graph-token-..." > .dev.vars
+which npx     # remember the path; you'll paste it into the plist below
+```
+
+Save the following as `~/Library/LaunchAgents/dev.roam-mcp.local.plist` (replace `YOU` with your username, the `npx` path with what `which npx` returned, and the `WorkingDirectory` if you cloned somewhere else):
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>dev.roam-mcp.local</string>
+  <key>WorkingDirectory</key>
+  <string>/Users/YOU/code/roam-mcp</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/homebrew/bin/npx</string>
+    <string>wrangler</string>
+    <string>dev</string>
+    <string>--port</string>
+    <string>8787</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key>
+  <string>/tmp/roam-mcp.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/roam-mcp.err.log</string>
+</dict>
+</plist>
+```
+
+(Apple Silicon Homebrew puts `npx` at `/opt/homebrew/bin/npx`; Intel Homebrew at `/usr/local/bin/npx`; nvm users will have a path under `~/.nvm/versions/node/...`.)
+
+Load and verify:
+
+```bash
+launchctl bootstrap gui/$UID ~/Library/LaunchAgents/dev.roam-mcp.local.plist
+launchctl print gui/$UID/dev.roam-mcp.local | grep -E 'state|pid'
+curl http://localhost:8787/check
+```
+
+Reload after editing the plist or `wrangler.toml`:
+
+```bash
+launchctl bootout gui/$UID/dev.roam-mcp.local
+launchctl bootstrap gui/$UID ~/Library/LaunchAgents/dev.roam-mcp.local.plist
+```
+
+Logs land at `/tmp/roam-mcp.log` and `/tmp/roam-mcp.err.log`.
+
+**B. Manual run (one-shot)**
+
+```bash
+cd ~/code/roam-mcp
 npx wrangler dev
 ```
 
-The local server listens on `http://localhost:8787/mcp`. Use the same `.mcp.json` shape from step 3 with that URL. The header override above works identically against the local server, which is convenient for switching test graphs without restarting `wrangler dev`.
+Same endpoint, but only while the terminal stays open. Useful for ad-hoc testing or when iterating on `wrangler.toml`.
 
 ### Alternative MCP servers / v1 fallback
 
