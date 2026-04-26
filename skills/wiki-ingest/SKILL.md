@@ -1,11 +1,17 @@
 ---
 name: wiki-ingest
-description: Use when adding a new source — paper, article, URL, file, transcript, code snippet — to a Roam-backed wiki. Extracts text into block-per-paragraph form so every excerpt earns a stable ((uid)) for citation. One ingest may touch 10-15 Roam pages.
+description: Use when adding a new source — paper, article, URL, file, transcript, code snippet — to a Roam-backed wiki. Extracts text into block-per-paragraph form so every excerpt earns a stable ((uid)) for citation. Also serves as a queue runner — process items the user (or earlier sessions) dropped under `#wiki-ingest-queue`. One ingest may touch 10-15 Roam pages.
 ---
 
 # Wiki Ingest
 
 Add a source to the Roam wiki. Read it, discuss with the user, write a source page (with extracted text uploaded as one paragraph per block), update entity/concept pages, run the backlink audit, and update the index, overview, and daily-note log.
+
+The skill operates in three modes:
+
+- **Mode A — Ingest now.** User provides a URL, file path, or pasted text. Run the full ingest flow.
+- **Mode B — Add to queue.** User wants to capture a source for later (no immediate ingest). Append a `{{[[TODO]]}} … #wiki-ingest-queue` block and stop.
+- **Mode C — Process queue.** No source supplied (or `--queue`). Pull pending `#wiki-ingest-queue` TODOs, present them, ingest the chosen ones in sequence.
 
 ## Pre-condition
 
@@ -15,9 +21,9 @@ Locate the wiki:
 2. If empty, fall back to `roam_search_by_text("Wiki Schema")` in case the user renamed it.
 3. If neither finds it, tell the user to run `wiki-init` first.
 
-Read the schema page in full to learn: domain, source types, raw path, index categories, attribute conventions.
+Read the schema page in full to learn: domain, allowed source kinds, raw path, index categories, attribute conventions.
 
-## Process
+## Process — Mode A (ingest now)
 
 ### 1. Accept the source
 
@@ -30,7 +36,23 @@ The source can be:
 
 Read all content. For long sources, read in sections. Do not skip.
 
-### 3. Surface takeaways — BEFORE writing anything
+### 3. Classify the source kind
+
+Pick a value for `Source kind::` from the taxonomy below. The kind drives **how `Raw Text::` is chunked** in step 5.
+
+| Source kind | Examples | Raw Text chunking | Notes |
+| --- | --- | --- | --- |
+| `paper` | arXiv PDF, journal article, ADR, RFC | one block per paragraph; if section headers exist, each section becomes a parent block with paragraph children | PDF binary stays in `raw/`; only extracted text is uploaded |
+| `article` | blog post, news, doc page | one block per paragraph | strip HTML chrome (nav, footer, comments) before splitting |
+| `transcript` | podcast, video, interview, meeting | **one block per speaker turn**, prefixed with the speaker name; long monologues split at paragraph boundaries within the turn | audio/video without an existing transcript is out of scope — transcribe externally first |
+| `code` | source file, config file, snippet | **one block per logical unit** (top-level function, class, struct, exported decl); imports/preamble in one combined block | each block prefixed with `path:line-range` so callers can recover location |
+| `book-excerpt` | book chapter, manual section | one block per paragraph | excerpt only — never upload a full book; respect copyright (see [[Wiki Schema]]) |
+| `thread` | Twitter/X, HN comment thread, mailing list | **one block per post or reply**, with the author/timestamp as the block prefix; reply chains use parent/child nesting | preserve the reply hierarchy via Roam's outliner |
+| `dataset` | CSV/JSON sample, OpenAPI spec, GraphQL schema | structural summary (schema, fields, cardinalities) + a handful of representative rows; **never paste the full file** | full file goes to `raw/`; the wiki page captures shape, not data |
+| `notes` | meeting notes, email, Slack/Discord export | one block per paragraph or message; if the source is a conversation, treat it like `transcript` | typically arrives via paste |
+| `other` | anything not matching above | LLM judgment, but record the chunking decision | add a `Chunking note::` attribute block explaining the choice |
+
+### 4. Surface takeaways — BEFORE writing anything
 
 Tell the user:
 - 3-5 bullet points of key takeaways
@@ -41,7 +63,7 @@ Ask: **"Anything specific you want me to emphasize or de-emphasize?"**
 
 Wait for the user's response before proceeding.
 
-### 4. Decide the page title
+### 5. Decide the page title
 
 Use a natural Roam title. Examples:
 - `Attention Is All You Need` (paper)
@@ -50,7 +72,7 @@ Use a natural Roam title. Examples:
 
 Check existence first: `roam_fetch_page_by_title(<title>)`. If the page already exists with content, decide whether to add to it or pick a more specific title. Then `roam_create_page(<title>)` for new pages.
 
-### 5. Build the source page
+### 6. Build the source page
 
 The source page layout — every concept is **its own block**. Multi-value attributes use parent + children, never comma-joined strings.
 
@@ -110,7 +132,7 @@ Tags::
 
 **Idempotency.** If you're re-ingesting an updated source, fetch the existing source page first and string-match children before appending — match the first ~80 chars of each Raw Text paragraph to skip already-uploaded content.
 
-### 6. Update entity and concept pages
+### 7. Update entity and concept pages
 
 For each entity/concept this source touches:
 
@@ -144,7 +166,7 @@ Related Concepts
 
 When the original phrasing matters, `{{embed: ((uid))}}` the source block instead of paraphrasing.
 
-### 7. Backlink audit — do not skip
+### 8. Backlink audit — do not skip
 
 Roam already maintains the `:block/refs` index, but textual mentions that don't use `[[…]]` won't appear there. For each new entity/concept:
 
@@ -154,7 +176,7 @@ Roam already maintains the `:block/refs` index, but textual mentions that don't 
 
 This is the step most commonly skipped. A compounding wiki's value comes from bidirectional links.
 
-### 8. Update `[[Wiki Index]]`
+### 9. Update `[[Wiki Index]]`
 
 Fetch `[[Wiki Index]]`. Find the category block (depth 1) that matches this source's category. Append a child block:
 
@@ -162,9 +184,9 @@ Fetch `[[Wiki Index]]`. Find the category block (depth 1) that matches this sour
 [[<page title>]] — <one-line summary> _(ingested <today, ordinal>)_
 ```
 
-For any new entity/concept pages created in step 6, add those under their categories too. Skip categories that already contain a string-matching entry (idempotency).
+For any new entity/concept pages created in step 7, add those under their categories too. Skip categories that already contain a string-matching entry (idempotency).
 
-### 9. Update `[[Wiki Overview]]`
+### 10. Update `[[Wiki Overview]]`
 
 Fetch `[[Wiki Overview]]`. If this source:
 - Introduces a significant concept → append a child block under `Key Entities / Concepts` referencing `[[<concept>]]`
@@ -173,7 +195,30 @@ Fetch `[[Wiki Overview]]`. If this source:
 
 Append a fresh `Updated:: <today>` attribute block at depth 0.
 
-### 10. Log to today's daily note
+### 11. Surface follow-up suggestions and offer to queue
+
+Before logging, look for ingest-worthy leads this source surfaced:
+
+- **Cited references that aren't in the wiki yet** — papers, blog posts, RFCs the source links to
+- **Sections you intentionally skipped** (long appendix, supplementary material) that may be worth ingesting later
+- **Adjacent sources** worth pulling in (the same author's other paper, a follow-up version, a competing approach)
+
+Present the list and ask: **"Queue any of these to `#wiki-ingest-queue` for later?"**
+
+For each accepted lead, append a queue TODO under the source page (or the user's preferred location):
+
+```
+{{[[TODO]]}} Ingest: <one-line description> #wiki-ingest-queue
+  URL:: <url or local path, if known>
+  Source kind:: paper | article | ...   (best guess; user can edit)
+  Reason:: <why this is worth ingesting>
+  Suggested by:: [[<this source page>]]
+  Queued:: <today, ordinal>
+```
+
+If the user adds their own queue items unprompted (e.g., pasting a list of URLs), accept the same format with whatever subset of children they provide. The minimum is `{{[[TODO]]}} <title or url> #wiki-ingest-queue`.
+
+### 12. Log to today's daily note
 
 Append (no `page` arg, defaults to today's daily note). Multi-value lists are parent attribute blocks with one child per item — never comma-joined into a single block string.
 
@@ -189,15 +234,68 @@ Append (no `page` arg, defaults to today's daily note). Multi-value lists are pa
     [[<page A>]]
     [[<page B>]]
     ...
+  Queue items added::
+    [[<follow-up 1>]]
+    [[<follow-up 2>]]
+    (or "none")
 ```
 
-### 11. Report to user
+If this run was triggered from a `#wiki-ingest-queue` TODO (Mode C, see below), also append the originating queue uid as a child block: `Closes queue item:: ((<queue-todo-uid>))`.
+
+### 13. Close the queue item (Mode C only)
+
+If this ingest was triggered by a queue TODO, append two child blocks under that TODO so the queue entry is auditable to the resulting source page:
+
+```
+Ingested as:: [[<source page title>]]
+Ingested on:: <today, ordinal>
+```
+
+Then tell the user: **"Mark `((<queue-todo-uid>))` as done in Roam UI to clear it from the active queue."** (roam-mcp can't flip `{{[[TODO]]}}` → `{{[[DONE]]}}` for you.)
+
+### 14. Report to user
 
 - Source page: `[[<title>]]` (with `Raw Text::` containing N blocks, uids captured for citation)
 - Entity/concept pages created or updated: <list with `[[Page]]` links>
 - Pages that received new `[[<entity>]]` references in the backlink audit: <list>
 - `[[Wiki Index]]` and `[[Wiki Overview]]` updated
+- Follow-up queue items added: <list, or "none">
+- If Mode C: closed queue item `((<uid>))` — remind user to mark it done in Roam UI
 - Logged to today's daily note as `#wiki-log #wiki-ingest`
+
+## Process — Mode B (add to queue without ingesting)
+
+When the user says "queue this for later" / "add to ingest queue" / passes a URL with `--queue`:
+
+1. Locate the wiki (same Pre-condition).
+2. Decide **where to drop the queue TODO** — under the user's daily note (default), or under a related source page if context makes it obvious. Ask if unclear.
+3. Append:
+
+   ```
+   {{[[TODO]]}} Ingest: <title or "<url>"> #wiki-ingest-queue
+     URL:: <url or local path>
+     Source kind:: paper | article | ...   (if known; otherwise omit)
+     Reason:: <why> (if user provided one)
+     Suggested by:: manual
+     Queued:: <today, ordinal>
+   ```
+
+4. Confirm to the user: queued at `((<uid>))`, run `wiki-ingest` with no source argument to process the queue when ready.
+5. Append a `#wiki-log #wiki-queue` block to today's daily note recording the addition.
+
+No source page is created in Mode B. Skip steps 1-12 of Mode A.
+
+## Process — Mode C (process the queue)
+
+When `wiki-ingest` is invoked with no source (or `--queue`):
+
+1. Locate the wiki.
+2. `roam_search_by_status("TODO")` then filter the result for blocks whose `:block/refs` include `wiki-ingest-queue`. (If the search returns more than ~50 items, ask whether to narrow by date or `Suggested by::`.)
+3. Present the list to the user with: title (root block string), URL, Source kind, Suggested by, Queued. Number the items.
+4. Ask: **"Process which? (numbers, comma-separated, or `all`, or `cancel`.)"**
+5. For each chosen item, run Mode A starting at step 2 ("Read the source in full"), passing the queue TODO's URL/path as the source. In step 13, close the queue item with the `Ingested as::` / `Ingested on::` children.
+6. After the batch, report: processed N items, M still pending, K skipped/cancelled.
+7. Append one `#wiki-log #wiki-queue` block to today's daily note summarizing the run.
 
 ## Common Mistakes
 
@@ -207,3 +305,6 @@ Append (no `page` arg, defaults to today's daily note). Multi-value lists are pa
 - **Forgetting to capture uids** — `roam_create_block` returns `uid` and `created_uids`; thread them into your subsequent citation blocks rather than re-fetching.
 - **Faking sub-bullets with `-`** — Roam treats one block as one idea. Use `children` instead.
 - **Comma-joining multi-value attributes** — `Sources:: [[a]], [[b]], [[c]]` defeats the outliner. Write the parent `Sources::` block, then one child block per ref. Same for `Pages updated::`, `Backlinks added on::`, `Tags::` (when more than 2-3).
+- **Wrong chunking for the source kind** — pasting a transcript paragraph-per-block instead of speaker-turn-per-block, or dumping a code file as a single Raw Text block. Re-read the Source kind taxonomy before writing.
+- **Skipping follow-up queue offer** — every paper/article cites adjacent work. Surface it and let the user decide whether to queue. Otherwise the wiki stops compounding.
+- **Closing a queue item without `Ingested as::`** — every Mode C run must thread the new source page back to the queue TODO so the audit trail is intact.

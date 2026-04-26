@@ -112,6 +112,7 @@ This gives `(title, uid, edit-time)` triples for all wiki pages. Cache the set o
 - **Missing concept pages** — `[[Foo]]` references that appear 3+ times across the wiki but `[[Foo]]` has no content of its own. Reuse the broken-links query and add a count threshold.
 - **Coverage gaps** — open questions listed in `[[Wiki Overview]]` (`Open Questions` section) that could be answered by a web search or a new ingest. LLM judgment.
 - **Missing cross-references** — pages that both discuss `[[Entity]]` but don't link to each other. Compute by joining `roam_search_for_tag(<entity>)` results in code.
+- **Ingest queue status** — `roam_search_by_status("TODO")` filtered by `#wiki-ingest-queue` for pending count + oldest items; `roam_search_by_status("DONE")` filtered by `#wiki-ingest-queue` for processed count since last lint. Flag any TODO items whose `Queued::` date is more than 60 days ago — likely abandoned and worth pruning.
 
 ### 3. Write the lint report
 
@@ -177,7 +178,19 @@ Summary
       [[Page B]]
     Issue:: pages do not link to each other
     Fix:: queue [[Entity]] reference under the relevant section of each page
+
+🔵 Ingest Queue Status
+  Pending:: <N>     ((roam_search_by_status("TODO") + #wiki-ingest-queue))
+  Processed since last lint:: <M>     ((roam_search_by_status("DONE") + #wiki-ingest-queue, filtered by Queued::/Ingested on:: date))
+  Oldest pending::
+    ((<queue-todo-uid>))   Queued <date>, Suggested by <source>
+    ((<queue-todo-uid>))   ...
+  Stale queue items (queued > 60 days ago, still TODO)::
+    ((<queue-todo-uid>))
+    ((<queue-todo-uid>))
 ```
+
+The Ingest Queue Status section is informational — surfaces backlog and progress. No fix offer; the user runs `wiki-ingest` (Mode C) to process pending items, or removes stale ones manually in Roam.
 
 Append to `[[Wiki Index]]` under a `Maintenance` category (create the category if it doesn't exist):
 
@@ -220,6 +233,9 @@ Always — do not ask permission. Counts and queued-fix references are siblings;
     [[Page A]] — added missing cross-reference
     [[Page B]] — flagged Status:: orphan
     (or one block: "none")
+  Ingest queue::
+    Pending:: <N>
+    Processed since last lint:: <M>
 ```
 
 ## Common Mistakes

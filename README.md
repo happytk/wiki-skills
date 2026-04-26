@@ -27,9 +27,9 @@ Then add roam-mcp to your Claude Code MCP servers list and confirm `roam_find_pa
 | Skill | Description |
 |---|---|
 | `wiki-init` | Bootstrap a new Roam-backed wiki for any domain — creates `[[Wiki Schema]]`, `[[Wiki Index]]`, `[[Wiki Overview]]`. |
-| `wiki-ingest` | Add a source (paper, URL, file, transcript) — uploads extracted text paragraph-per-block under `Raw Text::`, creates entity/concept pages, runs the backlink audit. |
-| `wiki-query` | Ask a question against the wiki — answers cite via `[[Page]]` and `((uid))` block refs into the original `Raw Text::` excerpts. |
-| `wiki-lint` | Health audit via Datalog: orphans, stale claims, broken refs, missing pages, contradictions. |
+| `wiki-ingest` | Add a source (paper, URL, file, transcript, …). Three modes: ingest now, queue for later (`#wiki-ingest-queue`), or process the queue. Uploads extracted text paragraph-per-block under `Raw Text::`, creates entity/concept pages, runs the backlink audit. |
+| `wiki-query` | Ask a question — answers cite via `[[Page]]` and `((uid))` block refs into `Raw Text::` excerpts; offers to queue gap-driven follow-ups for ingest. |
+| `wiki-lint` | Health audit via Datalog: orphans, stale claims, broken refs, missing pages, contradictions, and ingest-queue progress. |
 | `wiki-update` | Queue revisions as `{{[[TODO]]}} #wiki-change-request` blocks (roam-mcp has no update/delete API; you apply changes manually in Roam). |
 
 ## How It Works
@@ -48,6 +48,41 @@ Roam graph
 ```
 
 Plus a local `raw/` directory on disk for binary or oversized sources (PDFs, audio) that can't live as Roam blocks. The path is recorded in `[[Wiki Schema]]`.
+
+### What you can ingest
+
+| Source kind | Examples | Raw Text chunking |
+|---|---|---|
+| `paper` | arXiv PDF, journal article, ADR, RFC | one block per paragraph (or section → paragraph children) |
+| `article` | blog post, news, doc page | one block per paragraph |
+| `transcript` | podcast, video, interview, meeting | **one block per speaker turn** |
+| `code` | source file, config, snippet | **one block per logical unit** (function/class/decl) with `path:line-range` prefix |
+| `book-excerpt` | book chapter, manual section | one block per paragraph (excerpts only — copyright-aware) |
+| `thread` | Twitter/X, HN, mailing list | **one block per post or reply**, with reply chains as parent/child |
+| `dataset` | CSV/JSON sample, OpenAPI spec | structural summary + sample rows (full file → `raw/`) |
+| `notes` | meeting notes, email, Slack export | one block per paragraph or message |
+| `other` | anything else | LLM judgment, with a `Chunking note::` block recording the choice |
+
+Out of scope: ASR (audio/video without an existing transcript), OCR (image-only sources), and full uploads of large datasets or copyrighted full texts. For each, cite the source and excerpt the relevant parts.
+
+### Ingest queue
+
+You can capture sources to ingest later — anywhere in Roam — by dropping a TODO block:
+
+```
+{{[[TODO]]}} Ingest: <title or url> #wiki-ingest-queue
+  URL:: https://...
+  Source kind:: paper
+  Reason:: <why this is worth ingesting>
+  Queued:: April 25th, 2026
+```
+
+The minimum is `{{[[TODO]]}} <url> #wiki-ingest-queue`. Other skills also seed the queue:
+
+- `wiki-ingest` surfaces cited references and skipped sections after each run, and offers to queue them
+- `wiki-query` offers to queue gap-driven follow-ups whenever an answer reveals missing source coverage
+
+Run `wiki-ingest` with no source argument to **process the queue** — the skill pulls pending items, lets you pick which to ingest, runs the full ingest flow on each, and threads `Ingested as:: [[<source page>]]` back under the queue TODO. `roam_search_by_status("TODO")` filtered by `#wiki-ingest-queue` shows the pending backlog at any time; `wiki-lint` reports queue progress on each run.
 
 ### Page metadata
 
@@ -88,9 +123,9 @@ Sources::
 
 ```
 wiki-init          → bootstrap a new wiki
-wiki-ingest        → add sources one at a time (uploads text into Raw Text:: blocks; repeat)
-wiki-query         → ask questions; save good answers back as pages
-wiki-lint          → periodic health check (every 5-10 ingests)
+wiki-ingest        → add a source (Mode A) / queue for later (Mode B) / process the queue (Mode C)
+wiki-query         → ask questions; cite ((uid)); offer to queue gap follow-ups
+wiki-lint          → periodic health check (every 5-10 ingests); reports ingest-queue progress
 wiki-update        → queue revisions as #wiki-change-request TODOs
 ```
 
@@ -122,7 +157,8 @@ If a future MCP server exposes write transactions, `wiki-update` should be revis
 | `#wiki-analysis` | Saved query answers |
 | `#wiki-page` | Generic wiki page (codebase modules, flows, decisions) |
 | `#wiki-log` | Daily-note operation log entries (sub-tagged `#wiki-ingest`, `#wiki-query`, `#wiki-lint`, `#wiki-update`) |
-| `#wiki-change-request` | Queued edits for the user to apply manually |
+| `#wiki-change-request` | Queued edits for the user to apply manually (from `wiki-update` or `wiki-lint`) |
+| `#wiki-ingest-queue` | Sources captured for later ingest. Drop `{{[[TODO]]}} <url> #wiki-ingest-queue` anywhere; `wiki-ingest` (no args) processes the queue |
 
 ## Use Cases
 
