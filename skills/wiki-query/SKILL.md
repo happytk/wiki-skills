@@ -50,8 +50,8 @@ Write a response that:
 - Cites every claim using **`[[Page Title]]`** for topical references and **`((uid))`** for specific quotes or precise claims drawn from a particular `Raw Text::` block
 - Inlines `{{embed: ((uid))}}` when the original phrasing carries weight (a quote, a number, a precise definition)
 - Notes agreements and disagreements between pages — flag them as `[[Page A]] says X but [[Page B]] says Y`
-- Flags gaps: "the wiki has no page on X" or "[[Page]] doesn't cover Y yet"
-- Suggests follow-up sources to ingest or questions to investigate
+- Flags gaps explicitly: "the wiki has no page on X" or "[[Page]] doesn't cover Y yet"
+- For each flagged gap, names a concrete next step (a paper, URL, file, or question) — this is what step 5 will offer to queue
 
 Format for the question type:
 - Factual → prose with citations
@@ -120,6 +120,31 @@ Append to today's daily note:
   Filed:: not filed
 ```
 
+### 5. Offer to queue gap-driven follow-ups
+
+If the answer flagged any wiki gaps in step 3, present each flagged gap as a concrete follow-up and ask: **"Queue any of these to `#wiki-ingest-queue` for later ingest?"**
+
+For each accepted gap, append a queue TODO. Drop it under today's daily note by default, or under the most relevant existing source/concept page if context makes that obvious:
+
+```
+{{[[TODO]]}} Ingest: <gap → concrete next step> #wiki-ingest-queue
+  URL:: <url, if a specific source was identified>
+  Source kind:: paper | article | ...   (best guess)
+  Reason:: surfaced by query "<original question>"
+  Suggested by:: wiki-query <today, ordinal>
+  Queued:: <today, ordinal>
+```
+
+If the gap is a question that needs investigation rather than a specific source to ingest (e.g., "is X compatible with Y?"), append it to `[[Wiki Overview]]`'s `Open Questions` section as a plain block — those don't belong in the ingest queue.
+
+After queuing, append a child block to the daily-note query log:
+
+```
+  Queue items added::
+    ((<queue-todo-uid-1>))
+    ((<queue-todo-uid-2>))
+```
+
 ## Citation Rules
 
 - **`[[Page Title]]`** — use for topical attribution ("[[Transformer Architecture]] introduces self-attention")
@@ -136,3 +161,5 @@ Append to today's daily note:
 - **Forgetting to log** — every query operation must land in today's daily note tagged `#wiki-log #wiki-query`, even when the answer is not filed.
 - **Going deeper than two ref hops** — explodes context for marginal gain. Stop and ask the user if a deeper trace is needed.
 - **Comma-joining cited pages** — `Sources:: [[a]], [[b]], [[c]]` defeats the outliner. Use parent + child blocks.
+- **Naming a gap without naming the next step** — "the wiki has no page on X" is incomplete. State what would close the gap (a specific URL, paper, file) so the queue offer in step 5 is actionable.
+- **Queueing investigation questions instead of source-to-ingest items** — pure questions belong in `[[Wiki Overview]]` Open Questions. `#wiki-ingest-queue` is for concrete sources you'd hand to `wiki-ingest`.

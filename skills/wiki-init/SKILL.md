@@ -21,7 +21,7 @@ Bootstrap an LLM-maintained wiki inside a Roam Research graph using the [roam-mc
 
 Ask:
 1. **What is the domain/purpose?** (one sentence)
-2. **What types of sources will you add?** (papers, URLs, code files, transcripts, etc.)
+2. **Which source kinds will you ingest?** Pick from `paper | article | transcript | code | book-excerpt | thread | dataset | notes | other`. Default is "all" — narrow it only if you want the schema to advertise a smaller set. (Each kind has its own Raw Text chunking rule; see `wiki-ingest`'s Source-kind taxonomy.)
 3. **What categories should `[[Wiki Index]]` use?**
    - Research default: `Sources | Entities | Concepts | Analyses`
    - Codebase default: `Modules | APIs | Decisions | Flows` — see `codebase.md` in this skill's directory for detailed codebase guidance
@@ -44,7 +44,7 @@ For each of `Wiki Schema`, `Wiki Index`, `Wiki Overview`:
 
 - Roam has no YAML frontmatter. Page metadata lives as **flat top-level attribute blocks** of the form `Key:: value`. Roam indexes these regardless of depth, but flat top-level blocks show up in the right-sidebar attribute table.
 - One idea per block. Never use `-` bullets or newlines inside a single block string to fake hierarchy. Use the `children` argument or chain via `parent_uid`.
-- Tag write operations with a wiki namespace tag (`#wiki-meta`, `#wiki-source`, `#wiki-page`, `#wiki-entity`, `#wiki-analysis`, `#wiki-change-request`) so the auto-injected `#ai` is not the only filter available.
+- Tag write operations with a wiki namespace tag (`#wiki-meta`, `#wiki-source`, `#wiki-page`, `#wiki-entity`, `#wiki-analysis`, `#wiki-change-request`, `#wiki-ingest-queue`) so the auto-injected `#ai` is not the only filter available.
 
 ### 4. `[[Wiki Schema]]` content
 
@@ -53,10 +53,13 @@ Top-level blocks:
 ```
 Type:: #wiki-meta
 Domain:: <user's domain description>
-Source types:: <comma-separated>
+Source kinds allowed::
+  <one block per allowed kind, e.g. paper / article / transcript / ...>
 Raw path:: <absolute local path to raw/ directory>
 Created:: <today in ordinal format, e.g. April 25th, 2026>
 ```
+
+If the user said "all", list every kind from the Source-kind taxonomy as a child block. If they narrowed it, list only the chosen ones.
 
 Then a child tree:
 
@@ -93,7 +96,32 @@ Mutation policy
   roam-mcp exposes no update or delete tool — wiki content is append-only via this plugin
   wiki-update proposes changes as {{[[TODO]]}} Revise: ... blocks tagged #wiki-change-request
   Apply approved changes manually in the Roam UI, then mark the TODO done
-  roam_search_by_status("TODO") surfaces all pending change requests
+  roam_search_by_status("TODO") surfaces all pending TODOs
+
+TODO sub-types (filter by tag)
+  #wiki-change-request
+    Source:: wiki-update or wiki-lint
+    Action:: apply edit in Roam UI, then mark done
+  #wiki-ingest-queue
+    Source:: wiki-ingest follow-ups, wiki-query gap offers, or user manually
+    Action:: run wiki-ingest with no source → Mode C (queue runner)
+    Once ingested, wiki-ingest appends Ingested as:: [[<page>]] under the TODO
+
+Source kinds (allowed values for Source kind:: on source pages)
+  paper        — academic papers, ADRs, RFCs (paragraph-per-block)
+  article      — blog posts, news, doc pages (paragraph-per-block)
+  transcript   — podcast/video/interview/meeting (one block per speaker turn)
+  code         — source files, snippets (one block per logical unit)
+  book-excerpt — book chapter, manual section (paragraph-per-block, EXCERPTS only)
+  thread       — Twitter/X, HN, mailing list (one block per post/reply)
+  dataset      — CSV/JSON sample, OpenAPI spec (structural summary + sample rows)
+  notes        — meeting notes, email, chat export (paragraph or message)
+  other        — record the chunking decision in a Chunking note:: child
+
+Copyright
+  Upload only what is reasonable as fair-use excerpt. Never paste a whole book,
+  full paywalled paper, or other restricted content into Raw Text::. The wiki
+  is your synthesis, not a mirror — cite Source:: and excerpt key passages.
 
 Index categories
   <one block per category the user chose>
@@ -155,6 +183,7 @@ Tell the user:
 - Canonical pages: `[[Wiki Schema]]`, `[[Wiki Index]]`, `[[Wiki Overview]]`
 - Local raw directory: `<path>` (binary/oversized sources go here; text-extractable sources will be uploaded into Roam blocks by `wiki-ingest`)
 - Add sources by running `wiki-ingest` with a URL, file path, or pasted text
-- Run `wiki-lint` periodically to keep the wiki healthy
-- Every block this plugin writes is auto-tagged `#ai` by roam-mcp; filter on `#wiki-source`, `#wiki-entity`, etc. for wiki-specific views
-- Mutations are append-only — `wiki-update` queues TODO blocks for you to apply in the Roam UI
+- Save sources for later by dropping `{{[[TODO]]}} Ingest: <url> #wiki-ingest-queue` blocks anywhere in Roam, then running `wiki-ingest` with no arguments to process the queue
+- Run `wiki-lint` periodically to keep the wiki healthy and surface ingest-queue progress
+- Every block this plugin writes is auto-tagged `#ai` by roam-mcp; filter on `#wiki-source`, `#wiki-entity`, `#wiki-ingest-queue`, etc. for wiki-specific views
+- Mutations are append-only — `wiki-update` queues `#wiki-change-request` TODOs for you to apply in the Roam UI
