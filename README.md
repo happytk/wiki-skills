@@ -6,6 +6,8 @@ Instead of RAG (re-deriving answers from raw documents every time), this system 
 
 ## Prerequisites
 
+> ⚠️ **roam-mcp registration is required.** Every skill in v2 calls the `roam_*` tools (`roam_create_page`, `roam_create_block`, `roam_fetch_page_by_title`, `roam_search_for_tag`, `roam_search_by_text`, `roam_search_by_status`, `roam_datomic_query`, `roam_find_pages_modified_today`). If those tools aren't present in your Claude Code MCP context, every skill will stop at its first tool call. There is no filesystem fallback in v2 — if you don't plan to use a Roam graph, install [v1 instead](#alternative-mcp-servers--v1-fallback) and skip the rest of this section.
+
 This plugin talks to Roam through the [`roam-mcp`](https://github.com/happytk/roam-mcp) MCP server, which runs as a **Cloudflare Worker** (HTTP transport, JSON-RPC 2.0). Setup is two-sided: credentials live on the Worker; Claude Code only needs the Worker URL.
 
 ### 1. Roam credentials
@@ -61,6 +63,13 @@ Replace `<your-account>` with your Cloudflare subdomain.
 ### 4. Confirm the connection
 
 In a Claude Code session, ask Claude to call `roam_find_pages_modified_today`. If it returns a list (possibly empty), you're ready to run `wiki-init`. If it errors, re-check the `/check` endpoint and the URL in your MCP config.
+
+### Alternative MCP servers / v1 fallback
+
+If you don't want to deploy a Cloudflare Worker, you have two paths:
+
+- **Local stdio MCP server** — any MCP server that exposes the same `roam_*` tool surface (e.g. the npm-distributed [`roam-research-mcp`](https://www.npmjs.com/package/roam-research-mcp) by 2b3pro) can be registered with Claude Code via stdio transport. Tool names and parameters may differ slightly between implementations; verify by calling each `roam_*` tool from a Claude Code session before running the skills, and rename or wrap as needed. The skills assume the exact tool names listed at the top of this section.
+- **No Roam at all** — install v1 of this plugin, which writes filesystem markdown and has no MCP dependency. Pin the marketplace install to commit [`c5f2ce5`](https://github.com/kfchou/wiki-skills/tree/c5f2ce5). v1 and v2 are different plugins under the same name; do not run them against the same wiki.
 
 ## Installation
 
