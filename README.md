@@ -174,13 +174,13 @@ Same endpoint, but only while the terminal stays open. Useful for ad-hoc testing
 If you don't want to deploy a Cloudflare Worker, you have two paths:
 
 - **Local stdio MCP server** — any MCP server that exposes the same `roam_*` tool surface (e.g. the npm-distributed [`roam-research-mcp`](https://www.npmjs.com/package/roam-research-mcp) by 2b3pro) can be registered with Claude Code via stdio transport. Tool names and parameters may differ slightly between implementations; verify by calling each `roam_*` tool from a Claude Code session before running the skills, and rename or wrap as needed. The skills assume the exact tool names listed at the top of this section.
-- **No Roam at all** — install v1 of this plugin, which writes filesystem markdown and has no MCP dependency. Pin the marketplace install to commit [`c5f2ce5`](https://github.com/kfchou/wiki-skills/tree/c5f2ce5). v1 and v2 are different plugins under the same name; do not run them against the same wiki.
+- **No Roam at all** — install v1 of this plugin, which writes filesystem markdown and has no MCP dependency. Pin the marketplace install to commit [`c5f2ce5`](https://github.com/happytk/wiki-skills/tree/c5f2ce5). v1 and v2 are different plugins under the same name; do not run them against the same wiki.
 
 ## Installation
 
 ```bash
-/plugin marketplace add kfchou/wiki-skills
-/plugin install wiki-skills@kfchou/wiki-skills
+/plugin marketplace add happytk/wiki-skills
+/plugin install wiki-skills@happytk/wiki-skills
 ```
 
 ## Skills
@@ -340,7 +340,7 @@ Works for any domain where you're accumulating knowledge over time:
 
 ## Migration from v1 (filesystem / Obsidian)
 
-v1 of this plugin (commit [`c5f2ce5`](https://github.com/kfchou/wiki-skills/tree/c5f2ce5)) targeted filesystem markdown with YAML frontmatter and Obsidian-style `[[slug]]` links. v2 is a clean break — there is no automated migration. If you have an existing v1 wiki, install the plugin at the v1 SHA to keep the old behavior, or re-ingest your sources into Roam with the v2 plugin.
+v1 of this plugin (commit [`c5f2ce5`](https://github.com/happytk/wiki-skills/tree/c5f2ce5)) targeted filesystem markdown with YAML frontmatter and Obsidian-style `[[slug]]` links. v2 is a clean break — there is no automated migration. If you have an existing v1 wiki, install the plugin at the v1 SHA to keep the old behavior, or re-ingest your sources into Roam with the v2 plugin.
 
 ## Inspired By
 
