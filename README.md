@@ -66,14 +66,15 @@ In a Claude Code session, ask Claude to call `roam_find_pages_modified_today`. I
 
 ### Per-project Roam graph (header override)
 
-`roam-mcp` reads two HTTP headers per request that override the Worker's baked-in defaults:
+`roam-mcp` reads three HTTP headers per request:
 
-| Header | Overrides |
-| --- | --- |
-| `X-Roam-Graph` | `ROAM_GRAPH_NAME` from `wrangler.toml` |
-| `X-Roam-Token` | `ROAM_API_TOKEN` from the Worker secret |
+| Header | Effect | Default if absent |
+| --- | --- | --- |
+| `X-Roam-Graph` | Override `ROAM_GRAPH_NAME` from `wrangler.toml` | the Worker's baked-in graph |
+| `X-Roam-Token` | Override `ROAM_API_TOKEN` from the Worker secret | the Worker's baked-in token |
+| `X-Roam-Ai-Tag` | Toggle the auto `#ai` tag on root blocks of `roam_create_page`, `roam_create_block`, `roam_add_todo`. Accepts `true`/`false`, `1`/`0`, `on`/`off`, `yes`/`no` (case-insensitive) | `true` (auto-tag enabled) |
 
-This lets you register **one** roam-mcp endpoint at user scope and target a different Roam graph per project — no redeploy, no second MCP registration. In each project's `.mcp.json`:
+The first two let you register **one** roam-mcp endpoint at user scope and target a different Roam graph per project — no redeploy, no second MCP registration. The third lets you turn off the `#ai` noise per project (or for one specific MCP entry) without forking roam-mcp; see also [Tag conventions](#tag-conventions). In each project's `.mcp.json`:
 
 ```json
 {
@@ -83,7 +84,8 @@ This lets you register **one** roam-mcp endpoint at user scope and target a diff
       "url": "https://roam-mcp.<your-account>.workers.dev/mcp",
       "headers": {
         "X-Roam-Graph": "<project-graph>",
-        "X-Roam-Token": "roam-graph-token-xxxxxxxxxxxx"
+        "X-Roam-Token": "roam-graph-token-xxxxxxxxxxxx",
+        "X-Roam-Ai-Tag": "false"
       }
     }
   }
@@ -307,7 +309,7 @@ If a future MCP server exposes write transactions, `wiki-update` should be revis
 
 | Tag | Used for |
 | --- | --- |
-| `#ai` | Auto-injected by roam-mcp on every write — benign, but use the `#wiki-*` tags below for filtering. |
+| `#ai` | Auto-injected by roam-mcp on every write by default. Disable per MCP entry with the `X-Roam-Ai-Tag: false` header (see [Per-project Roam graph](#per-project-roam-graph-header-override)). When left on, use the `#wiki-*` tags below for filtering. |
 | `#wiki-meta` | Schema, index, overview, lint reports |
 | `#wiki-source` | Source pages (papers, articles, etc.) |
 | `#wiki-entity` / `#wiki-concept` | Entity and concept pages |

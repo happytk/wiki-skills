@@ -44,7 +44,7 @@ For each of `Wiki Schema`, `Wiki Index`, `Wiki Overview`:
 
 - Roam has no YAML frontmatter. Page metadata lives as **flat top-level attribute blocks** of the form `Key:: value`. Roam indexes these regardless of depth, but flat top-level blocks show up in the right-sidebar attribute table.
 - One idea per block. Never use `-` bullets or newlines inside a single block string to fake hierarchy. Use the `children` argument or chain via `parent_uid`.
-- Tag write operations with a wiki namespace tag (`#wiki-meta`, `#wiki-source`, `#wiki-page`, `#wiki-entity`, `#wiki-analysis`, `#wiki-change-request`, `#wiki-ingest-queue`) so the auto-injected `#ai` is not the only filter available.
+- Tag write operations with a wiki namespace tag (`#wiki-meta`, `#wiki-source`, `#wiki-page`, `#wiki-entity`, `#wiki-analysis`, `#wiki-change-request`, `#wiki-ingest-queue`) so filtering doesn't depend on the `#ai` auto-tag (which roam-mcp adds by default but can be disabled per MCP entry via the `X-Roam-Ai-Tag: false` header — see the README).
 
 ### 4. `[[Wiki Schema]]` content
 
@@ -185,5 +185,5 @@ Tell the user:
 - Add sources by running `wiki-ingest` with a URL, file path, or pasted text
 - Save sources for later by dropping `{{[[TODO]]}} Ingest: <url> #wiki-ingest-queue` blocks anywhere in Roam, then running `wiki-ingest` with no arguments to process the queue
 - Run `wiki-lint` periodically to keep the wiki healthy and surface ingest-queue progress
-- Every block this plugin writes is auto-tagged `#ai` by roam-mcp; filter on `#wiki-source`, `#wiki-entity`, `#wiki-ingest-queue`, etc. for wiki-specific views
+- By default every block this plugin writes is auto-tagged `#ai` by roam-mcp; set the MCP entry's `X-Roam-Ai-Tag: false` header to turn that off. Either way, filter on `#wiki-source`, `#wiki-entity`, `#wiki-ingest-queue`, etc. for wiki-specific views
 - Mutations are append-only — `wiki-update` queues `#wiki-change-request` TODOs for you to apply in the Roam UI
