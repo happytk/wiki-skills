@@ -252,14 +252,35 @@ If this run was triggered from a `#wiki-ingest-queue` TODO (Mode C, see below), 
 
 ### 13. Close the queue item (Mode C only)
 
-If this ingest was triggered by a queue TODO, append two child blocks under that TODO so the queue entry is auditable to the resulting source page:
+If this ingest was triggered by a queue TODO, the item must be marked done so it stops appearing in `roam_search_by_status("TODO")` filtered by `#wiki-ingest-queue`. The path depends on whether mutation is enabled.
 
-```
-Ingested as:: [[<source page title>]]
-Ingested on:: <today, ordinal>
-```
+**With `X-Roam-Mutate: true` (preferred):**
 
-Then tell the user: **"Mark `((<queue-todo-uid>))` as done in Roam UI to clear it from the active queue."** (roam-mcp can't flip `{{[[TODO]]}}` → `{{[[DONE]]}}` for you.)
+1. Append two audit child blocks under the queue TODO:
+   ```
+   Ingested as:: [[<source page title>]]
+   Ingested on:: <today, ordinal>
+   ```
+2. Read the queue TODO's current root string (you already have it from the Mode C step 3 listing).
+3. Replace `{{[[TODO]]}}` with `{{[[DONE]]}}` in that string and call `roam_update_block(uid=<queue-todo-uid>, content=<new string>)`. The audit children remain attached.
+
+After both calls, the queue entry is closed automatically — no user action needed.
+
+**Without mutation (legacy):** append the audit children only, then tell the user: *"Mark `((<queue-todo-uid>))` as done in Roam UI."* (Without `X-Roam-Mutate`, `roam_update_block` is hidden.)
+
+#### Closing without ingesting
+
+When the user decides a queue item is no longer worth ingesting (source unavailable, content turned out to be irrelevant, etc.) instead of running the full Mode A flow:
+
+1. Append a single child block under the TODO recording the reason:
+   ```
+   Closed without ingest:: <reason in one line>
+   Closed on:: <today, ordinal>
+   ```
+2. With mutation: `roam_update_block` to flip `{{[[TODO]]}}` → `{{[[DONE]]}}` (same as above).
+3. Without mutation: ask the user to mark it done in Roam UI.
+
+This keeps the audit trail (queue history, decisions to skip) without polluting the active TODO list.
 
 ### 14. Report to user
 
@@ -268,7 +289,7 @@ Then tell the user: **"Mark `((<queue-todo-uid>))` as done in Roam UI to clear i
 - Pages that received new `[[<entity>]]` references in the backlink audit: <list>
 - `[[Wiki Index]]` and `[[Wiki Overview]]` updated
 - Follow-up queue items added: <list, or "none">
-- If Mode C: closed queue item `((<uid>))` — remind user to mark it done in Roam UI
+- If Mode C: closed queue items — list each `((<uid>))` and whether the close was by ingest or skip; if mutation was unavailable, note which TODOs still need a manual UI check
 - Logged to today's daily note as `#wiki-log #wiki-ingest`
 
 ## Process — Mode B (add to queue without ingesting)
@@ -315,7 +336,8 @@ When `wiki-ingest` is invoked with no source (or `--queue`):
 - **Comma-joining multi-value attributes** — `Sources:: [[a]], [[b]], [[c]]` defeats the outliner. Write the parent `Sources::` block, then one child block per ref. Same for `Pages updated::`, `Backlinks added on::`, `Tags::` (when more than 2-3).
 - **Wrong chunking for the source kind** — pasting a transcript paragraph-per-block instead of speaker-turn-per-block, or dumping a code file as a single Raw Text block. Re-read the Source kind taxonomy before writing.
 - **Skipping follow-up queue offer** — every paper/article cites adjacent work. Surface it and let the user decide whether to queue. Otherwise the wiki stops compounding.
-- **Closing a queue item without `Ingested as::`** — every Mode C run must thread the new source page back to the queue TODO so the audit trail is intact.
+- **Closing a queue item without `Ingested as::` / `Closed without ingest::`** — every Mode C run must thread either an "ingested as" or a "closed without ingest" audit child block under the TODO so the audit trail is intact.
+- **Telling the user to flip `{{[[TODO]]}}` → `{{[[DONE]]}}` in Roam UI when `X-Roam-Mutate: true` is enabled** — the skill must call `roam_update_block` to do it itself. Manual instructions belong only in legacy mode.
 - **Sending undefined/null content to a write tool** — every block content (root and children) must be a non-empty string. Iterating over an entity/source list with empty slots produces blocks like `undefined #ai` that you cannot delete. Validate before each write call; drop missing entries and tell the user.
 - **Writing `Updated::` blocks** — Roam tracks edit time via `:edit/time` on every block, exposed in the Roam UI and via `roam_datomic_query`. Manual `Updated::` blocks accumulate (no mutate API) and add no information. Don't write them; lint reads `:edit/time` instead.
 - **Creating a new `Sources::` parent on every ingest** — when a page already has `Sources::`, append the new ref as a child of the existing parent. A second sibling `Sources::` block is the bug pattern that produces noisy duplicates.
