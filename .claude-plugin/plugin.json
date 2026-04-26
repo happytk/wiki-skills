@@ -1,6 +1,6 @@
 {
   "name": "wiki-skills",
-  "version": "2.2.3",
+  "version": "2.2.4",
   "description": "LLM-maintained personal wiki skills for Claude Code, backed by a Roam Research graph via the roam-mcp MCP server. Implements Karpathy's LLM Wiki pattern with paragraph-per-block source extraction so every excerpt earns a stable ((uid)) for citation. Mutation tools (update / delete / move / rename / delete-page) supported via the X-Roam-Mutate header; falls back to a #wiki-change-request TODO queue when mutation is disabled.",
   "author": {
     "name": "happytk",
