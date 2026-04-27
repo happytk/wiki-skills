@@ -83,18 +83,28 @@ For non-codebase wikis, drop prefixes — Roam's `[[Attention Is All You Need]]`
 
 ## Page Layout (Roam attribute blocks, not YAML)
 
-Every codebase wiki page has flat top-level attribute blocks at depth 0. Multi-value attributes (sources, tags when more than 2-3) are parent attribute blocks with one child per ref — never comma-joined into a single block string.
+Codebase wiki pages (`#wiki-page`) follow the same three-group top level as the other content types: `Type::` alone at depth 0, then a `Meta` parent for attributes, then a `Notes` parent for content sections. Multi-value attributes (sources, tags when more than 2-3) are parent attribute blocks with one child per ref — never comma-joined into a single block string.
 
 ```
 Type:: #wiki-page
-Category:: Module | API | Decision | Flow
-Sources::
-  [[Source Page Title 1]]
-  [[Source Page Title 2]]
-Tags:: #auth #postgres        (1-3 short tags inline; otherwise expand to parent + children)
-```
 
-…followed by section blocks (`Summary`, `Boundaries`, `Decisions Affecting This`, `Cross-References`, etc.) as siblings, each holding one child block per idea.
+Meta
+  Category:: Module | API | Decision | Flow
+  Sources::
+    [[Source Page Title 1]]
+    [[Source Page Title 2]]
+  Tags:: #auth #postgres        (1-3 short tags inline; otherwise expand to parent + children)
+
+Notes
+  Summary
+    <one block per idea>
+  Boundaries
+    ...
+  Decisions Affecting This
+    ...
+  Cross-References
+    ...
+```
 
 When a claim ties to a specific source paragraph, cite via `((uid))` into that source's `Raw Text::` block.
 

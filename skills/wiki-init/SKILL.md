@@ -43,129 +43,149 @@ For each of `Wiki Schema`, `Wiki Index`, `Wiki Overview`:
 
 **Convention notes for every page you create:**
 
-- Roam has no YAML frontmatter. Page metadata lives as **flat top-level attribute blocks** of the form `Key:: value`. Roam indexes these regardless of depth, but flat top-level blocks show up in the right-sidebar attribute table.
+- Roam has no YAML frontmatter. Page metadata lives as `Key:: value` blocks. Roam's attribute index resolves these regardless of depth — backlinks, the page-attribute table, and `:block/refs` all work the same whether `Source::` sits at the page top level or one level under a `Meta` parent.
+- **Three-group top level for content pages** (`#wiki-source`, `#wiki-entity`, `#wiki-concept`, `#wiki-page`, `#wiki-analysis`): `Type::` alone at depth 0, then a `Meta` parent grouping every other attribute (`Source::`, `Sources::`, `Source kind::`, `Tags::`, `Aliases::`, `Category::`, etc.), then a `Notes` parent grouping every content section (`Summary`, `Key Takeaways`, `Description`, `Raw Text`, etc.). This makes meta and body visually distinct in the outliner without sacrificing index behavior.
+- Pure-navigation `#wiki-meta` pages (`Wiki Index`, `Wiki Overview`) stay flat — `Type::` at depth 0, then their categories/sections at depth 0 — because they are dashboards, not entries, and an extra `Notes` wrapper would add a click for every read.
 - One idea per block. Never use `-` bullets or newlines inside a single block string to fake hierarchy. Use the `children` argument or chain via `parent_uid`.
 - Tag write operations with a wiki namespace tag (`#wiki-meta`, `#wiki-source`, `#wiki-page`, `#wiki-entity`, `#wiki-analysis`, `#wiki-change-request`, `#wiki-ingest-queue`) so filtering doesn't depend on the `#ai` auto-tag (which roam-mcp adds by default but can be disabled per MCP entry via the `X-Roam-Ai-Tag: false` header — see the README).
 
 ### 4. `[[Wiki Schema]]` content
 
-Top-level blocks:
+Build the schema page using the three-group top level: `Type::` alone, `Meta` for the schema's own configuration attributes, `Notes` for the long-form conventions doc that downstream skills read.
 
 ```
 Type:: #wiki-meta
-Domain:: <user's domain description>
-Language:: Korean      (or English / 다국어 — the language used for wiki BODY content; Raw Text:: stays in source language)
-Source kinds allowed::
-  <one block per allowed kind, e.g. paper / article / transcript / ...>
-Raw path:: <absolute local path to raw/ directory>
-Created:: <today in ordinal format, e.g. April 25th, 2026>
+
+Meta
+  Domain:: <user's domain description>
+  Language:: Korean      (or English / 다국어 — the language used for wiki BODY content; Raw Text:: stays in source language)
+  Source kinds allowed::
+    <one block per allowed kind, e.g. paper / article / transcript / ...>
+  Raw path:: <absolute local path to raw/ directory>
+  Created:: <today in ordinal format, e.g. April 25th, 2026>
 ```
 
-If the user said "all", list every kind from the Source-kind taxonomy as a child block. If they narrowed it, list only the chosen ones.
+If the user said "all", list every kind from the Source-kind taxonomy as a child block under `Source kinds allowed::`. If they narrowed it, list only the chosen ones.
 
-Then a child tree:
+Then under a `Notes` parent at depth 0, append the conventions tree:
 
 ```
-Conventions
-  Page references use [[Page Title]] (Roam-native; no slug munging)
-  Block references use ((9-char-uid)). Embed inline excerpts with {{embed: ((uid))}}
-  Tags: #tag and [[tag]] are equivalent; both produce :block/refs
-  Each idea is its own block. Never simulate sub-bullets inside one block string
-  Outliner discipline
-    A block holds ONE idea. Never pack a comma-separated list of refs or
-    a structured `Key: a; Key: b` payload into one string
-    When an attribute has multiple values, write it as a parent attribute
-    block with one CHILD block per value:
-      Sources::
-        [[Source A]]
-        [[Source B]]
-        [[Source C]]
-    Multi-fact sections are also parent + children:
-      Pages updated::
-        [[Entity 1]]
-        [[Entity 2]]
-    A short single ref or 1-3 short tags may stay inline (Tags:: #ml #transformer)
-  Page metadata is a set of flat top-level attribute blocks (Key:: value)
-  Required attribute on every wiki page: Type::
-  Last-edited time is tracked automatically by Roam (:edit/time on every block) — DO NOT write Updated:: blocks; they accumulate without a mutate API and Roam already exposes the canonical edit time
-  Daily-note titles MUST use the ordinal date format (April 25th, 2026)
-  Language policy
-    The wiki has a primary Language:: attribute (default Korean)
-    All wiki BODY content is written in that language regardless of source
-    language: Summary, Key Takeaways, Description, Appearances notes,
-    Related Concepts, Reason::, Source:: prose, query Answer paragraphs,
-    Open Questions, lint report explanations, Fix:: prose, daily-note
-    log lines
-    Original-language verbatim is preserved ONLY in:
-      Raw Text:: blocks (one paragraph per block, source verbatim)
-      {{embed: ((uid))}} embeds and ((uid)) inline citations
-      Direct quotes — when quoting, mark with quotes and cite the uid
-    Page titles
-      Source pages (papers/articles/products): use the canonical published
-        name. If a Korean version is widely used, that; otherwise the
-        original (e.g. "Attention Is All You Need" stays English)
-      Entity / concept / analysis pages: use the wiki language
-        (e.g. [[트랜스포머]], not [[Transformer]])
-      For entities widely known by a non-wiki-language name, add an
-        Aliases:: parent attribute block on the page with one child per
-        alternate name. Other pages can ref either name; the wiki
-        canonicalizes to the wiki-language title
-    Code identifiers, Roam syntax ([[]], ((uid)), Key::), tag names,
-    file paths, URLs are NEVER translated — they are tokens, not prose
+Notes
+  Conventions
+    Page references use [[Page Title]] (Roam-native; no slug munging)
+    Block references use ((9-char-uid)). Embed inline excerpts with {{embed: ((uid))}}
+    Tags: #tag and [[tag]] are equivalent; both produce :block/refs
+    Each idea is its own block. Never simulate sub-bullets inside one block string
+    Page hierarchy (Type / Meta / Notes)
+      Content pages (#wiki-source / #wiki-entity / #wiki-concept / #wiki-page / #wiki-analysis)
+        use a three-group top level: Type:: at depth 0, then a Meta parent
+        grouping every other attribute (Source::, Sources::, Source kind::, Tags::,
+        Aliases::, Category::, ...), then a Notes parent grouping every content
+        section (Summary, Key Takeaways, Description, Raw Text, ...)
+      Roam's Key:: value attribute index resolves regardless of depth, so nesting
+        attributes one level under Meta does not affect the right-sidebar
+        attribute table, ((uid)) resolution, or :block/refs backlinks
+      Pure-navigation #wiki-meta pages ([[Wiki Index]], [[Wiki Overview]]) stay
+        flat — they are dashboards, not entries — Type:: at depth 0 followed by
+        their categories/sections at depth 0, no Notes wrapper
+      Existing pages on the legacy flat layout keep working; wiki-lint flags them
+        as advisory only. Re-grouping is opt-in, page by page
+    Outliner discipline
+      A block holds ONE idea. Never pack a comma-separated list of refs or
+      a structured `Key: a; Key: b` payload into one string
+      When an attribute has multiple values, write it as a parent attribute
+      block with one CHILD block per value:
+        Sources::
+          [[Source A]]
+          [[Source B]]
+          [[Source C]]
+      Multi-fact sections are also parent + children:
+        Pages updated::
+          [[Entity 1]]
+          [[Entity 2]]
+      A short single ref or 1-3 short tags may stay inline (Tags:: #ml #transformer)
+    Required attribute on every wiki page: Type:: (top-level — depth 0, never under Meta)
+    Last-edited time is tracked automatically by Roam (:edit/time on every block) — DO NOT write Updated:: blocks; they accumulate without a mutate API and Roam already exposes the canonical edit time
+    Daily-note titles MUST use the ordinal date format (April 25th, 2026)
+    Language policy
+      The wiki has a primary Language:: attribute (default Korean)
+      All wiki BODY content is written in that language regardless of source
+      language: Summary, Key Takeaways, Description, Appearances notes,
+      Related Concepts, Reason::, Source:: prose, query Answer paragraphs,
+      Open Questions, lint report explanations, Fix:: prose, daily-note
+      log lines
+      Original-language verbatim is preserved ONLY in:
+        Raw Text:: blocks (one paragraph per block, source verbatim)
+        {{embed: ((uid))}} embeds and ((uid)) inline citations
+        Direct quotes — when quoting, mark with quotes and cite the uid
+      Page titles
+        Source pages (papers/articles/products): use the canonical published
+          name. If a Korean version is widely used, that; otherwise the
+          original (e.g. "Attention Is All You Need" stays English)
+        Entity / concept / analysis pages: use the wiki language
+          (e.g. [[트랜스포머]], not [[Transformer]])
+        For entities widely known by a non-wiki-language name, add an
+          Aliases:: parent attribute block on the page with one child per
+          alternate name. Other pages can ref either name; the wiki
+          canonicalizes to the wiki-language title
+      Code identifiers, Roam syntax ([[]], ((uid)), Key::), tag names,
+      file paths, URLs are NEVER translated — they are tokens, not prose
 
-Operation log
-  Logs are appended to today's daily note as blocks tagged #wiki-log
-  Ops also carry a sub-tag: #wiki-log #ingest, #wiki-log #query, #wiki-log #lint, #wiki-log #update
-  Recall recent ops via roam_search_for_tag("wiki-log")
+  Operation log
+    Logs are appended to today's daily note as blocks tagged #wiki-log
+    Ops also carry a sub-tag: #wiki-log #ingest, #wiki-log #query, #wiki-log #lint, #wiki-log #update
+    Recall recent ops via roam_search_for_tag("wiki-log")
 
-Mutation policy
-  roam-mcp exposes 5 mutation tools, gated by the X-Roam-Mutate: true header on the MCP entry:
-    roam_update_block(uid, content)              replace block string
-    roam_delete_block(uid)                       delete block + descendants (cascades)
-    roam_move_block(uid, parent_uid|page, order) relocate block
-    roam_rename_page(title|uid, new_title)       rename page; Roam refs auto-rewire
-    roam_delete_page(title|uid)                  delete entire page (DESTRUCTIVE)
-  When the header is set, wiki-update applies edits in place per-confirmation
-  When the header is not set, wiki-update falls back to legacy queue mode:
-    every change becomes a {{[[TODO]]}} Revise: ... block tagged #wiki-change-request
-    user applies the edits manually in Roam UI, then marks the TODO done
-  Probe at the start of every wiki-update / wiki-lint run to choose the path
-  roam_search_by_status("TODO") surfaces pending change requests in legacy mode
+  Mutation policy
+    roam-mcp exposes 5 mutation tools, gated by the X-Roam-Mutate: true header on the MCP entry:
+      roam_update_block(uid, content)              replace block string
+      roam_delete_block(uid)                       delete block + descendants (cascades)
+      roam_move_block(uid, parent_uid|page, order) relocate block
+      roam_rename_page(title|uid, new_title)       rename page; Roam refs auto-rewire
+      roam_delete_page(title|uid)                  delete entire page (DESTRUCTIVE)
+    When the header is set, wiki-update applies edits in place per-confirmation
+    When the header is not set, wiki-update falls back to legacy queue mode:
+      every change becomes a {{[[TODO]]}} Revise: ... block tagged #wiki-change-request
+      user applies the edits manually in Roam UI, then marks the TODO done
+    Probe at the start of every wiki-update / wiki-lint run to choose the path
+    roam_search_by_status("TODO") surfaces pending change requests in legacy mode
 
-TODO sub-types (filter by tag)
-  #wiki-change-request
-    Source:: wiki-update or wiki-lint, only emitted in legacy queue mode (no X-Roam-Mutate)
-    Action:: apply edit in Roam UI, then mark done — or enable X-Roam-Mutate and re-run
-  #wiki-ingest-queue
-    Source:: wiki-ingest follow-ups, wiki-query gap offers, or user manually
-    Action:: run wiki-ingest with no source → Mode C (queue runner)
-    Once ingested, wiki-ingest appends Ingested as:: [[<page>]] under the TODO
+  TODO sub-types (filter by tag)
+    #wiki-change-request
+      Source:: wiki-update or wiki-lint, only emitted in legacy queue mode (no X-Roam-Mutate)
+      Action:: apply edit in Roam UI, then mark done — or enable X-Roam-Mutate and re-run
+    #wiki-ingest-queue
+      Source:: wiki-ingest follow-ups, wiki-query gap offers, or user manually
+      Action:: run wiki-ingest with no source → Mode C (queue runner)
+      Once ingested, wiki-ingest appends Ingested as:: [[<page>]] under the TODO
 
-Source kinds (allowed values for Source kind:: on source pages)
-  paper        — academic papers, ADRs, RFCs (paragraph-per-block)
-  article      — blog posts, news, doc pages (paragraph-per-block)
-  transcript   — podcast/video/interview/meeting (one block per speaker turn)
-  code         — source files, snippets (one block per logical unit)
-  book-excerpt — book chapter, manual section (paragraph-per-block, EXCERPTS only)
-  thread       — Twitter/X, HN, mailing list (one block per post/reply)
-  dataset      — CSV/JSON sample, OpenAPI spec (structural summary + sample rows)
-  notes        — meeting notes, email, chat export (paragraph or message)
-  other        — record the chunking decision in a Chunking note:: child
+  Source kinds (allowed values for Source kind:: on source pages)
+    paper        — academic papers, ADRs, RFCs (paragraph-per-block)
+    article      — blog posts, news, doc pages (paragraph-per-block)
+    transcript   — podcast/video/interview/meeting (one block per speaker turn)
+    code         — source files, snippets (one block per logical unit)
+    book-excerpt — book chapter, manual section (paragraph-per-block, EXCERPTS only)
+    thread       — Twitter/X, HN, mailing list (one block per post/reply)
+    dataset      — CSV/JSON sample, OpenAPI spec (structural summary + sample rows)
+    notes        — meeting notes, email, chat export (paragraph or message)
+    other        — record the chunking decision in a Chunking note:: child
 
-Copyright
-  Upload only what is reasonable as fair-use excerpt. Never paste a whole book,
-  full paywalled paper, or other restricted content into Raw Text::. The wiki
-  is your synthesis, not a mirror — cite Source:: and excerpt key passages.
+  Copyright
+    Upload only what is reasonable as fair-use excerpt. Never paste a whole book,
+    full paywalled paper, or other restricted content into Raw Text::. The wiki
+    is your synthesis, not a mirror — cite Source:: and excerpt key passages.
 
-Index categories
-  <one block per category the user chose>
+  Index categories
+    <one block per category the user chose>
 ```
 
 If the domain is a codebase, append a child block that mirrors the README-vs-wiki rule from `codebase.md`.
 
 ### 5. `[[Wiki Index]]` content
 
-Keep the index shallow — `roam_fetch_page_by_title` truncates beyond 3 levels. Layout:
+`Wiki Index` is a pure-navigation page — keep it flat, with `Type::` at depth 0 and category blocks directly at depth 0 below it (no `Notes` wrapper). The Conventions section in `[[Wiki Schema]]` records this exemption so wiki-lint won't flag it.
+
+Keep the index shallow — `roam_fetch_page_by_title` truncates beyond 3 levels.
 
 ```
 Type:: #wiki-meta
@@ -181,6 +201,8 @@ Maintenance
 Each category lives at depth 1; page entries land at depth 2.
 
 ### 6. `[[Wiki Overview]]` content
+
+`Wiki Overview` is the other dashboard page — same exemption as Wiki Index. Type:: at depth 0, then sections at depth 0.
 
 ```
 Type:: #wiki-meta

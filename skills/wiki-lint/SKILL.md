@@ -78,6 +78,25 @@ This gives `(title, uid, edit-time)` triples for all wiki pages. Cache the set o
 
 **🟡 Warnings (should fix)**
 
+- **Legacy flat layout (advisory)** — content pages (`#wiki-source`, `#wiki-entity`, `#wiki-concept`, `#wiki-page`, `#wiki-analysis`) where meta attributes (`Source::`, `Sources::`, `Source kind::`, `Tags::`, `Aliases::`, `Category::`) sit as direct children of the page rather than nested under a `Meta` parent. The wiki still functions correctly — Roam's attribute index is depth-tolerant — so this is **advisory only**. Surface the page so the user can opt to re-group it (manually or via wiki-update) when convenient. Do **not** auto-rewrite. `Type::` itself stays at depth 0 by design and is exempt.
+
+  ```clojure
+  [:find ?title
+   :where
+   [?p :node/title ?title]
+   [?p :block/children ?type-block]
+   [?type-block :block/string ?ts]
+   [(re-find #"^Type:: #wiki-(source|entity|concept|page|analysis)" ?ts)]
+   [?p :block/children ?attr]
+   [?attr :block/string ?as]
+   [(re-find #"^(Source|Sources|Source kind|Tags|Aliases|Category)::" ?as)]
+   (not-join [?p]
+     [?p :block/children ?meta]
+     [?meta :block/string "Meta"])]
+  ```
+
+  Pure-navigation `#wiki-meta` pages (`Wiki Index`, `Wiki Overview`) are exempt — they're dashboards and stay flat by convention.
+
 - **Orphan pages** — wiki pages with zero inbound `:block/refs` from anywhere except `[[Wiki Index]]` and the daily-note log. Approximate with:
 
   ```clojure
@@ -127,71 +146,81 @@ Today's date in ordinal format → page title `Lint April 25th, 2026`.
 
 ```
 Type:: #wiki-meta #lint
-Run date:: <today, ordinal>
 
-Summary
-  🔴 Errors:: <N>
-  🟡 Warnings:: <N>
-  🔵 Info:: <N>
+Meta
+  Run date:: <today, ordinal>
 
-🔴 Pages Referenced But Not Created
-  [[Missing Foo]]
-    Referenced from::
-      [[Source Page A]]
-      [[Source Page B]]
-    Fix:: create [[Missing Foo]] or replace the references
+Notes
+  Summary
+    🔴 Errors:: <N>
+    🟡 Warnings:: <N>
+    🔵 Info:: <N>
 
-🔴 Missing Required Attributes
-  [[Page]]
-    Missing::
-      Type::
+  🔴 Pages Referenced But Not Created
+    [[Missing Foo]]
+      Referenced from::
+        [[Source Page A]]
+        [[Source Page B]]
+      Fix:: create [[Missing Foo]] or replace the references
 
-🟡 Orphan Pages
-  [[Slug]]
-    Status:: no inbound references outside [[Wiki Index]]
-    Fix:: add link from a related page, or delete if no longer relevant
+  🔴 Missing Required Attributes
+    [[Page]]
+      Missing::
+        Type::
 
-🟡 Contradictions
-  Conflict on <topic>
-    [[Page A]]
-      Claim:: "<claim>"
-    [[Page B]]
-      Claim:: "<conflicting claim>"
-    Recommendation:: <which to trust, or "investigate further">
+  🟡 Legacy Flat Layout (advisory)
+    [[Page]]
+      Detected meta attributes at depth 0::
+        Source::
+        Tags::
+      Fix:: re-group under a Meta parent when convenient. The wiki still functions; this is cosmetic. wiki-update can move the blocks via roam_move_block when mutation is enabled.
 
-🟡 Stale Claims
-  [[Page]]
-    Last edited:: <date from :edit/time>
-    Trigger:: contains "latest"
-    Fix:: re-verify the claim; any corrective edit will refresh :edit/time, or queue a wiki-update
+  🟡 Orphan Pages
+    [[Slug]]
+      Status:: no inbound references outside [[Wiki Index]]
+      Fix:: add link from a related page, or delete if no longer relevant
 
-🔵 Missing Concept Pages
-  [[Foo]]
-    Reference count:: N
-    Fix:: run wiki-ingest or create a stub via wiki-update
-
-🔵 Coverage Gaps
-  Open question from [[Wiki Overview]]
-    Question:: "<question>"
-    Suggestion:: search for <X> or ingest <source type>
-
-🔵 Missing Cross-References
-  [[Entity]]
-    Discussed by::
+  🟡 Contradictions
+    Conflict on <topic>
       [[Page A]]
+        Claim:: "<claim>"
       [[Page B]]
-    Issue:: pages do not link to each other
-    Fix:: queue [[Entity]] reference under the relevant section of each page
+        Claim:: "<conflicting claim>"
+      Recommendation:: <which to trust, or "investigate further">
 
-🔵 Ingest Queue Status
-  Pending:: <N>     ((roam_search_by_status("TODO") + #wiki-ingest-queue))
-  Processed since last lint:: <M>     ((roam_search_by_status("DONE") + #wiki-ingest-queue, filtered by Queued::/Ingested on:: date))
-  Oldest pending::
-    ((<queue-todo-uid>))   Queued <date>, Suggested by <source>
-    ((<queue-todo-uid>))   ...
-  Stale queue items (queued > 60 days ago, still TODO)::
-    ((<queue-todo-uid>))
-    ((<queue-todo-uid>))
+  🟡 Stale Claims
+    [[Page]]
+      Last edited:: <date from :edit/time>
+      Trigger:: contains "latest"
+      Fix:: re-verify the claim; any corrective edit will refresh :edit/time, or queue a wiki-update
+
+  🔵 Missing Concept Pages
+    [[Foo]]
+      Reference count:: N
+      Fix:: run wiki-ingest or create a stub via wiki-update
+
+  🔵 Coverage Gaps
+    Open question from [[Wiki Overview]]
+      Question:: "<question>"
+      Suggestion:: search for <X> or ingest <source type>
+
+  🔵 Missing Cross-References
+    [[Entity]]
+      Discussed by::
+        [[Page A]]
+        [[Page B]]
+      Issue:: pages do not link to each other
+      Fix:: queue [[Entity]] reference under the relevant section of each page
+
+  🔵 Ingest Queue Status
+    Pending:: <N>     ((roam_search_by_status("TODO") + #wiki-ingest-queue))
+    Processed since last lint:: <M>     ((roam_search_by_status("DONE") + #wiki-ingest-queue, filtered by Queued::/Ingested on:: date))
+    Oldest pending::
+      ((<queue-todo-uid>))   Queued <date>, Suggested by <source>
+      ((<queue-todo-uid>))   ...
+    Stale queue items (queued > 60 days ago, still TODO)::
+      ((<queue-todo-uid>))
+      ((<queue-todo-uid>))
 ```
 
 The Ingest Queue Status section is informational — surfaces backlog and progress. No fix offer; the user runs `wiki-ingest` (Mode C) to process pending items, or removes stale ones manually in Roam.
@@ -218,6 +247,7 @@ Mutation availability decides the fix path. **Probe first** (same as wiki-update
 | Block in wrong section | `roam_move_block(uid, parent_uid=<correct section uid>, order=<n>)`. |
 | Pages referenced but not created | `roam_create_page(<title>)` + a stub Type:: attribute. The user can populate later via wiki-ingest. |
 | Stub page that should be merged into another | `roam_rename_page(title=<stub>, new_title=<canonical>)` consolidates into the canonical page (Roam merges blocks). Confirm and surface inbound-ref count from `roam_search_for_tag` first. |
+| Legacy flat layout (advisory) | `roam_create_block(content="Meta", page=<title>, order=1)` then `roam_move_block(uid=<attr-uid>, parent_uid=<meta-uid>)` for each meta attribute, and the same with a `Notes` parent for content sections. **Always opt-in per page** — never bulk-rewrite. Skip this row entirely if the user prefers to leave existing pages alone; it's purely cosmetic. |
 
 **Without mutation (legacy queue mode):** queue each fix as a `{{[[TODO]]}} … #wiki-change-request` block under the affected page (the v2.0 behavior). Tell the user clearly that mutation was unavailable and recommend enabling `X-Roam-Mutate: true`.
 

@@ -92,6 +92,8 @@ Updated by:: wiki-update <today, ordinal>
 
 (This is metadata about the *edit*, not a `Updated::` attribute on the page — Roam's `:edit/time` already records the edit timestamp.)
 
+**Page hierarchy.** New pages follow the `Type::` / `Meta` / `Notes` three-group top level (see [[Wiki Schema]] Conventions). When editing a legacy flat-layout page, **leave the layout alone** unless the user explicitly opts to re-group — `roam_update_block` and `roam_create_block` calls work the same regardless of depth, so there's no functional reason to migrate. If the user does opt in (e.g. responding to a wiki-lint advisory), use `roam_create_block` to make `Meta` and `Notes` parents, then `roam_move_block` each existing attribute / section under the right parent. Confirm per move; never bulk-rewrite. `Type::` always stays at depth 0.
+
 **Page rename safety.** Before `roam_rename_page`, scan inbound refs (`roam_search_for_tag(<old title>)`) and report the count to the user (e.g., "23 blocks across 7 pages reference this title — they will all auto-update"). Roam's ref index handles the rewiring; no follow-up edits to those blocks are needed. Update only the wiki-managed entries that contain the title as a string (e.g., the `[[Wiki Index]]` one-liner) using `roam_update_block` if those entries are out of sync after the rename.
 
 ### 4. Check for downstream effects

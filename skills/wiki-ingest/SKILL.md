@@ -85,69 +85,88 @@ Check existence first: `roam_fetch_page_by_title(<title>)`. If the page already 
 
 ### 6. Build the source page
 
-The source page layout — every concept is **its own block**. Multi-value attributes use parent + children, never comma-joined strings.
+The source page layout uses a **three-group top level**: `Type::` alone at depth 0, then a `Meta` parent for source metadata, then a `Notes` parent for synthesis and verbatim content. Every concept is still **its own block**; multi-value attributes use parent + children, never comma-joined strings. Roam's `Key:: value` attribute index and `:block/refs` index resolve regardless of depth, so nesting attributes one level under `Meta` does not affect attribute lookup, page-attribute table, or backlinks.
 
-Top-level blocks (each line below is a separate block created via `roam_create_block`; capture every returned uid for later citation):
+Top-level shape (each line is a separate block created via `roam_create_block`; capture every returned uid for later citation):
 
 ```
 Type:: #wiki-source
-Source:: <URL or absolute file path under Raw path::>
-Source kind:: paper | article | transcript | code | other
-Tags:: #<topic1> #<topic2>          (1-3 short tags inline is fine; otherwise split below)
 
-Summary                                       (←  WIKI LANGUAGE — body in Korean if Language::Korean)
-  <paragraph 1 — one block, in wiki language>
-  <paragraph 2 — one block, in wiki language>
-  <paragraph 3 — one block, in wiki language>  (each cites Raw Text:: via ((uid)) where applicable)
+Meta
+  Source:: <URL or absolute file path under Raw path::>
+  Source kind:: paper | article | transcript | code | other
+  Tags:: #<topic1> #<topic2>          (1-3 short tags inline is fine; otherwise split below)
 
-Key Takeaways                                 (← WIKI LANGUAGE)
-  <takeaway 1 — one block>
-  <takeaway 2 — one block>
-  ...
+Notes
+  Summary                                       (← WIKI LANGUAGE — body in Korean if Language::Korean)
+    <paragraph 1 — one block, in wiki language>
+    <paragraph 2 — one block, in wiki language>
+    <paragraph 3 — one block, in wiki language>  (each cites Raw Text:: via ((uid)) where applicable)
 
-Entities & Concepts                           (← page titles per Language policy; notes in wiki language)
-  [[Entity 1]]
-    <one-line note in wiki language>
-  [[Concept 2]]
-    <one-line note in wiki language>
-  ...
+  Key Takeaways                                 (← WIKI LANGUAGE)
+    <takeaway 1 — one block>
+    <takeaway 2 — one block>
+    ...
 
-Relation to Other Wiki Pages                  (← WIKI LANGUAGE)
-  Connects to [[Other Page]]
-    <reason in wiki language — child block>
-  Updates the claim in [[Other Page A]]
-    <which claim and how, in wiki language — child block>
+  Entities & Concepts                           (← page titles per Language policy; notes in wiki language)
+    [[Entity 1]]
+      <one-line note in wiki language>
+    [[Concept 2]]
+      <one-line note in wiki language>
+    ...
 
-Raw Text                                      (← ORIGINAL SOURCE LANGUAGE — verbatim, never translate)
-  <paragraph 1 of the source verbatim — one block>
-  <paragraph 2 of the source verbatim — one block>
-  ...
+  Relation to Other Wiki Pages                  (← WIKI LANGUAGE)
+    Connects to [[Other Page]]
+      <reason in wiki language — child block>
+    Updates the claim in [[Other Page A]]
+      <which claim and how, in wiki language — child block>
+
+  Raw Text                                      (← ORIGINAL SOURCE LANGUAGE — verbatim, never translate)
+    <paragraph 1 of the source verbatim — one block>
+    <paragraph 2 of the source verbatim — one block>
+    ...
 ```
 
-If you have many tags or many topical refs, expand the inline form into parent + children:
+If you have many tags or many topical refs, expand the inline form into parent + children under `Meta`:
 
 ```
-Tags::
-  #<topic1>
-  #<topic2>
-  #<topic3>
-  ...
+Meta
+  Tags::
+    #<topic1>
+    #<topic2>
+    #<topic3>
+    ...
 ```
 
 **Construction recipe:**
 
-1. Build a single nested `children` tree and pass it to `roam_create_block(content="Type:: #wiki-source", page=<title>, children=[…])` — but Roam's `Key:: value` attribute index works best when each attribute is its own top-level block, so create the attribute blocks one at a time at depth 0 first, then create the section parents (`Summary`, `Key Takeaways`, `Entities & Concepts`, `Relation to Other Wiki Pages`, `Raw Text`) each with their content as a `children` tree.
-2. **Raw Text uploading** — split the source into paragraph-sized units (or logical units for code/transcripts: function, scene, speaker turn). Pass them as the `children` of the `Raw Text` block in a single `roam_create_block` call. Capture the `created_uids` from the response. These uids are the citation handles for the rest of the wiki.
-3. Write the `Summary` blocks **after** `Raw Text` is uploaded so summary paragraphs can `((uid))`-cite the original lines. Use `{{embed: ((uid))}}` when the original phrasing carries weight (a quotable claim, a precise number).
+1. Create `Type:: #wiki-source` at depth 0 first (one `roam_create_block` call). This is the lone top-level attribute and the marker `wiki-lint` uses to recognize wiki-managed pages.
+2. Create the `Meta` parent at depth 0, then create each metadata attribute (`Source::`, `Source kind::`, `Tags::`, etc.) as a child of `Meta`. You can pass them as a single `children=[…]` tree on the `Meta` create call.
+3. Create the `Notes` parent at depth 0, then create the section blocks (`Summary`, `Key Takeaways`, `Entities & Concepts`, `Relation to Other Wiki Pages`, `Raw Text`) as children of `Notes`, each with their own content as a `children` tree.
+4. **Raw Text uploading** — split the source into paragraph-sized units (or logical units for code/transcripts: function, scene, speaker turn). Pass them as the `children` of the `Raw Text` block in a single `roam_create_block` call. Capture the `created_uids` from the response. These uids are the citation handles for the rest of the wiki.
+5. Write the `Summary` blocks **after** `Raw Text` is uploaded so summary paragraphs can `((uid))`-cite the original lines. Use `{{embed: ((uid))}}` when the original phrasing carries weight (a quotable claim, a precise number).
 
 **Pre-write validation (mandatory).** Before EVERY `roam_create_block` / `roam_create_page` / `roam_add_todo` call, verify each `content` field — including every `content` inside the `children` tree — is a non-empty string. If a value is `undefined`, `null`, an empty string, or the literal string `"undefined"`/`"null"`, **drop that entry** (don't send it) and surface the gap to the user before proceeding. The auto `#ai` suffix concat means an undefined value renders as a literal `undefined #ai` block in Roam — `roam_delete_block` can clean it up but only when `X-Roam-Mutate: true`, so don't write it in the first place.
 
-**Idempotency on re-ingest.** If you're re-ingesting an updated source, fetch the existing source page first and walk the existing `Raw Text::` children:
+**Idempotency on re-ingest.** If you're re-ingesting an updated source, fetch the existing source page first and walk the existing `Raw Text` children. The page may use the new `Notes` > `Raw Text` layout or the legacy flat layout (Raw Text at page top level) — locate `Raw Text` by string + page rather than by direct-child position so the walk works either way. A depth-tolerant Datalog pull:
+
+```clojure
+[:find ?uid ?s
+ :where
+ [?p :node/title "<source title>"]
+ [?rt :block/string "Raw Text"]
+ [?rt :block/page ?p]
+ [?rt :block/children ?c]
+ [?c :block/uid ?uid]
+ [?c :block/string ?s]]
+```
+
+Then:
 
 1. Match each new paragraph against existing children by the first ~80 chars.
 2. **Identical match** → skip; reuse the existing `((uid))` (any wiki page that already cites it stays valid).
 3. **Existing block, slightly changed source text** (same paragraph, edited wording) → if `X-Roam-Mutate: true` is enabled, call `roam_update_block(uid=<existing>, content=<new>)` to keep the citation stable. If mutation is disabled, append the new version as a sibling and tag it `Supersedes:: ((<old-uid>))` so readers know which is current.
-4. **New paragraph not in the existing tree** → append as a new child of `Raw Text::` (single `roam_create_block` call with `children=[…]` for the new paragraphs only).
+4. **New paragraph not in the existing tree** → append as a new child of the existing `Raw Text` block (single `roam_create_block` call with `parent_uid=<raw-text-uid>` and `children=[…]` for the new paragraphs only). Do **not** create a fresh `Raw Text` sibling — append under whichever `Raw Text` parent already exists, regardless of layout generation.
 5. **Existing block whose source paragraph was deleted upstream** → if mutation is enabled, `roam_delete_block(uid=<existing>)` only when no other wiki page cites that uid (run `roam_search_for_tag(<source title>)` and check). When uncertain, leave it and append a new `Sources note:: this paragraph removed in <date> revision` child block instead.
 
 The mutation calls require the `X-Roam-Mutate: true` header on your MCP entry; without it, fall back to the v2.0 append-only behavior (rule 4 only) and tell the user that re-ingest could not refresh existing blocks in place.
@@ -156,34 +175,37 @@ The mutation calls require the `X-Roam-Mutate: true` header on your MCP entry; w
 
 For each entity/concept this source touches:
 
-- **Page exists** (`roam_fetch_page_by_title` returns a tree): read it, then add **only what is actually new**. For `Sources::` — if it's currently a parent attribute block, append `[[<source title>]]` as a new child of that existing parent (do NOT create another `Sources::` sibling). If it's a single-value inline attribute (legacy shape) leave it and append a new child `[[<source title>]]` to the page-level Sources:: parent if you can identify one; otherwise leave the legacy block and append the new ref under the relevant section instead. Roam tracks edit time on every block via `:edit/time` — do NOT write `Updated:: <today>` blocks.
-- **Page doesn't exist:** `roam_create_page(<entity>)`, then create attribute + section blocks. One concept per block; multi-value attributes use parent + children:
+- **Page exists** (`roam_fetch_page_by_title` returns a tree): read it, then add **only what is actually new**. For `Sources::` — locate the existing parent attribute block by string + page (it may sit at depth 0 on legacy pages or under `Meta` on new pages); append `[[<source title>]]` as a new child of that existing parent (do NOT create another `Sources::` sibling, regardless of where the existing one lives). If `Sources::` exists only as a single-value inline attribute (legacy shape) leave it and append the new ref under the same parent's grandparent location. Roam tracks edit time on every block via `:edit/time` — do NOT write `Updated:: <today>` blocks.
+- **Page doesn't exist:** `roam_create_page(<entity>)`, then build the page using the same three-group top level (`Type::` / `Meta` / `Notes`) as a source page. One concept per block; multi-value attributes use parent + children:
 
 ```
 Type:: #wiki-entity            (or #wiki-concept)
-Sources::
-  [[<this source title>]]      (additional source pages will be added here as siblings on future ingests)
-Aliases::                      (optional — add when the canonical title is in the wiki language but the entity is also widely known by other names)
-  <alternate name 1>
-  <alternate name 2>
-Tags::
-  #<topic1>
-  #<topic2>
 
-Description                                   (← WIKI LANGUAGE)
-  <paragraph 1 in wiki language, citing ((uid)) into Raw Text:: of the source>
-  <paragraph 2 in wiki language>
+Meta
+  Sources::
+    [[<this source title>]]    (additional source pages will be added here as siblings on future ingests)
+  Aliases::                    (optional — add when the canonical title is in the wiki language but the entity is also widely known by other names)
+    <alternate name 1>
+    <alternate name 2>
+  Tags::
+    #<topic1>
+    #<topic2>
 
-Appearances in Sources                        (← notes in WIKI LANGUAGE; uids unchanged)
-  [[<source title>]]
-    <one-line note in wiki language — child block>
-    ((uid-of-key-quote))         (separate child block — the citation itself)
+Notes
+  Description                                 (← WIKI LANGUAGE)
+    <paragraph 1 in wiki language, citing ((uid)) into Raw Text:: of the source>
+    <paragraph 2 in wiki language>
 
-Related Concepts                              (← WIKI LANGUAGE)
-  [[<related entity 1>]]
-    <relationship in wiki language — child block>
-  [[<related entity 2>]]
-    <relationship in wiki language — child block>
+  Appearances in Sources                      (← notes in WIKI LANGUAGE; uids unchanged)
+    [[<source title>]]
+      <one-line note in wiki language — child block>
+      ((uid-of-key-quote))       (separate child block — the citation itself)
+
+  Related Concepts                            (← WIKI LANGUAGE)
+    [[<related entity 1>]]
+      <relationship in wiki language — child block>
+    [[<related entity 2>]]
+      <relationship in wiki language — child block>
 ```
 
 When the original phrasing carries weight, `{{embed: ((uid))}}` the source block instead of paraphrasing — the embed renders the original-language verbatim alongside your wiki-language synthesis.
