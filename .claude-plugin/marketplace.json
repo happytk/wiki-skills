@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "LLM-maintained personal wiki skills for Claude Code, backed by Roam Research via roam-mcp",
-    "version": "2.3.0"
+    "version": "2.3.1"
   },
   "plugins": [
     {
@@ -16,7 +16,7 @@
         "url": "https://github.com/happytk/wiki-skills.git"
       },
       "description": "Five skills implementing Karpathy's LLM Wiki pattern against a Roam Research graph (via roam-mcp): wiki-init, wiki-ingest, wiki-query, wiki-lint, wiki-update. Source text is uploaded paragraph-per-block so every excerpt has a stable ((uid)) for citation. wiki-update / wiki-lint apply edits in place when the MCP entry sets X-Roam-Mutate: true (using roam_update_block / roam_delete_block / roam_move_block / roam_rename_page / roam_delete_page); otherwise falls back to a #wiki-change-request TODO queue.",
-      "version": "2.3.0",
+      "version": "2.3.1",
       "strict": true
     }
   ]

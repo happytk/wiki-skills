@@ -153,17 +153,37 @@ After queuing, append a child block to the daily-note query log:
 
 ## Citation Rules
 
-- **`[[Page Title]]`** — use for topical attribution ("[[Transformer Architecture]] introduces self-attention")
-- **`((uid))`** — use for any specific claim, definition, statistic, or quote that traces to one paragraph of source text. Always pair with the parent `[[Page]]` somewhere in the response so a reader can navigate even if Roam strips block-ref hover ("…as stated in `[[Attention Is All You Need]]` ((Abc12dEfG))").
-- **`{{embed: ((uid))}}`** — use sparingly when the original phrasing must be preserved (a precise definition, an exact number, a contested quote).
+The same answer is delivered through two different channels and they have different citation needs.
 
-**Block-uid stability caveat:** `((uid))` survives edits, but the surrounding context can drift if the source page is restructured. Pair every long-lived citation with the parent `[[Page]]` for context recovery.
+### Chat reply (the immediate response the user reads in the conversation)
+
+- **`((uid))` is OPAQUE in chat** — Claude Code shows the literal 9-character string with no resolution. The reader cannot click it, hover it, or see what it points to.
+- **Every citation in chat must carry its own meaning.** Format: `[[Page Title]]` for topical reference + a verbatim quote (in original language) for the substantive content. The `((uid))` may appear as a small parenthetical at the end as a stable handle, but the quote is what makes the citation legible.
+- **Good chat citation:**
+  > `[[여름의 빌라]]`의 「흑설탕 캔디」에서 꿈속 할머니는 주먹을 쥔 채 *"이건 내 것이란다."*라고 말합니다 _(((c3UeffbYx)))_.
+- **Bad chat citation (uid-only):**
+  > 꿈속에서 할머니는 주먹을 꼭 쥔 채 말합니다 — "이건 내 것이란다." ((c3UeffbYx))
+  > (Quote IS shown here, but the trailing `((c3UeffbYx))` is dead weight unless the user is reading this inside Roam — in chat it's noise.)
+- **Rule of thumb:** if you remove the `((uid))` from a chat sentence, does the reader still understand it? If yes, keep it (it's still useful for filing). If no, you missed the verbatim quote — add it.
+
+### Filed analysis page (saved as a Roam page)
+
+- **`((uid))` resolves natively in Roam** — hovering shows the source block, clicking jumps to it. Use freely.
+- **`{{embed: ((uid))}}`** for substantive quotes you want rendered inline as the original-language verbatim block.
+- **`[[Page Title]]`** for topical reference.
+- The Answer paragraphs you write into the filed page can be more uid-dense than the chat reply, because Roam fills in the meaning.
+
+### Both channels
+
+- Pair every long-lived `((uid))` with its parent `[[Page]]` so a reader can recover context even if Roam strips the block-ref hover or the surrounding source page is restructured.
+- Block-uid stability: `((uid))` survives edits, but the surrounding context in the source `Raw Text::` can drift over time.
 
 ## Common Mistakes
 
 - **Answering from memory** — always read the wiki first. The wiki may contradict what you think you know, and that contradiction is valuable signal.
 - **Skipping the save offer** — good query answers compound the wiki's value. Always offer.
 - **`[[Page]]`-only citations** — a query response without `((uid))` citations is weak when source text exists in `Raw Text::`. Reach for the original.
+- **`((uid))`-only chat citations** — leaving `((uid))` in a chat sentence without a verbatim quote next to it gives the reader an opaque token. The uid is for filing; the quote is for reading.
 - **Forgetting to log** — every query operation must land in today's daily note tagged `#wiki-log #wiki-query`, even when the answer is not filed.
 - **Going deeper than two ref hops** — explodes context for marginal gain. Stop and ask the user if a deeper trace is needed.
 - **Comma-joining cited pages** — `Sources:: [[a]], [[b]], [[c]]` defeats the outliner. Use parent + child blocks.
