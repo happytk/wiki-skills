@@ -21,7 +21,18 @@ Locate the wiki:
 2. If empty, fall back to `roam_search_by_text("Wiki Schema")` in case the user renamed it.
 3. If neither finds it, tell the user to run `wiki-init` first.
 
-Read the schema page in full to learn: domain, allowed source kinds, raw path, index categories, attribute conventions.
+Read the schema page in full to learn: domain, **`Language::` (wiki body language; default Korean if missing)**, allowed source kinds, raw path, index categories, attribute conventions.
+
+## Language policy (applies to every step below)
+
+The wiki has a primary `Language::` from the schema. **All wiki body content this skill writes must be in that language**, regardless of the source's language. Body content includes: Summary paragraphs, Key Takeaways bullets, Entities & Concepts notes, Relation to Other Wiki Pages prose, entity Description paragraphs, Appearances notes, Related Concepts relationship strings, Sources note prose, daily-note log lines.
+
+**Source verbatim** is preserved only in:
+- `Raw Text::` blocks (one paragraph per block, exactly as the source reads — never translate)
+- `{{embed: ((uid))}}` embeds in Summary / entity blocks where the original phrasing matters
+- Direct quotations (mark with quotes + a `((uid))` citation)
+
+For an English source ingested into a Korean wiki, you produce: Korean Summary that cites `((uid))` into the English Raw Text. The reader sees Korean synthesis with one click to the English original. For source-page titles, see [[Wiki Schema]]'s Language policy — canonical published names stay in their original language; entity/concept/analysis page titles use the wiki language.
 
 ## Process — Mode A (ingest now)
 
@@ -54,21 +65,21 @@ Pick a value for `Source kind::` from the taxonomy below. The kind drives **how 
 
 ### 4. Surface takeaways — BEFORE writing anything
 
-Tell the user:
+Tell the user, **in the wiki's `Language::`** (Korean by default — even if the source is English):
 - 3-5 bullet points of key takeaways
-- What entities/concepts this introduces or updates
+- What entities/concepts this introduces or updates (proper nouns and unfamiliar technical terms can stay in original — explain in the wiki language)
 - Whether it contradicts anything already in the wiki. To check, run `roam_search_by_text(<entity>)` and `roam_search_for_tag(<entity>)` for each candidate, fetch the relevant pages, and read.
 
-Ask: **"Anything specific you want me to emphasize or de-emphasize?"**
+Ask (in the wiki language): **"강조하거나 덜 다루고 싶은 부분 있나요?"** (or the equivalent in the wiki's set language).
 
 Wait for the user's response before proceeding.
 
 ### 5. Decide the page title
 
-Use a natural Roam title. Examples:
-- `Attention Is All You Need` (paper)
-- `OpenAI GPT-5 Release Notes` (article)
-- `Mod: Auth Service` (codebase, see `codebase.md`)
+Title language follows the schema's Language policy:
+- **Source pages** — use the canonical published name in its original language. Don't translate paper/product titles. Examples: `Attention Is All You Need`, `OpenAI GPT-5 Release Notes`. If a Korean version is widely used (e.g. localized release notes), use that.
+- **Codebase domain** — keep prefixes (`Mod: …`, `API: …`, `Decision: …`, `Flow: …`) and use the wiki language for the descriptive part: `Mod: 인증 서비스` for a Korean wiki, `Mod: Auth Service` for English.
+- **Entity / concept / analysis pages (later steps)** — use the wiki language. `[[트랜스포머]]` not `[[Transformer]]` for a Korean wiki. Add an `Aliases::` parent attribute block with one child per common alternate name so backlinks survive.
 
 Check existence first: `roam_fetch_page_by_title(<title>)`. If the page already exists with content, decide whether to add to it or pick a more specific title. Then `roam_create_page(<title>)` for new pages.
 
@@ -84,30 +95,30 @@ Source:: <URL or absolute file path under Raw path::>
 Source kind:: paper | article | transcript | code | other
 Tags:: #<topic1> #<topic2>          (1-3 short tags inline is fine; otherwise split below)
 
-Summary
-  <paragraph 1 — one block>
-  <paragraph 2 — one block>
-  <paragraph 3 — one block>          (each cites Raw Text:: via ((uid)) where applicable)
+Summary                                       (←  WIKI LANGUAGE — body in Korean if Language::Korean)
+  <paragraph 1 — one block, in wiki language>
+  <paragraph 2 — one block, in wiki language>
+  <paragraph 3 — one block, in wiki language>  (each cites Raw Text:: via ((uid)) where applicable)
 
-Key Takeaways
+Key Takeaways                                 (← WIKI LANGUAGE)
   <takeaway 1 — one block>
   <takeaway 2 — one block>
   ...
 
-Entities & Concepts
+Entities & Concepts                           (← page titles per Language policy; notes in wiki language)
   [[Entity 1]]
-    <one-line note about how this source relates to the entity — one child block>
+    <one-line note in wiki language>
   [[Concept 2]]
-    <one-line note — one child block>
+    <one-line note in wiki language>
   ...
 
-Relation to Other Wiki Pages
+Relation to Other Wiki Pages                  (← WIKI LANGUAGE)
   Connects to [[Other Page]]
-    <reason — child block>
+    <reason in wiki language — child block>
   Updates the claim in [[Other Page A]]
-    <which claim, and how — child block>
+    <which claim and how, in wiki language — child block>
 
-Raw Text
+Raw Text                                      (← ORIGINAL SOURCE LANGUAGE — verbatim, never translate)
   <paragraph 1 of the source verbatim — one block>
   <paragraph 2 of the source verbatim — one block>
   ...
@@ -152,27 +163,30 @@ For each entity/concept this source touches:
 Type:: #wiki-entity            (or #wiki-concept)
 Sources::
   [[<this source title>]]      (additional source pages will be added here as siblings on future ingests)
+Aliases::                      (optional — add when the canonical title is in the wiki language but the entity is also widely known by other names)
+  <alternate name 1>
+  <alternate name 2>
 Tags::
   #<topic1>
   #<topic2>
 
-Description
-  <paragraph 1 — one block, citing ((uid)) into Raw Text:: of the source>
-  <paragraph 2 — one block>
+Description                                   (← WIKI LANGUAGE)
+  <paragraph 1 in wiki language, citing ((uid)) into Raw Text:: of the source>
+  <paragraph 2 in wiki language>
 
-Appearances in Sources
+Appearances in Sources                        (← notes in WIKI LANGUAGE; uids unchanged)
   [[<source title>]]
-    <one-line note — child block>
-    ((uid-of-key-quote))         (separate child block for the citation)
+    <one-line note in wiki language — child block>
+    ((uid-of-key-quote))         (separate child block — the citation itself)
 
-Related Concepts
+Related Concepts                              (← WIKI LANGUAGE)
   [[<related entity 1>]]
-    <relationship — child block>
+    <relationship in wiki language — child block>
   [[<related entity 2>]]
-    <relationship — child block>
+    <relationship in wiki language — child block>
 ```
 
-When the original phrasing matters, `{{embed: ((uid))}}` the source block instead of paraphrasing.
+When the original phrasing carries weight, `{{embed: ((uid))}}` the source block instead of paraphrasing — the embed renders the original-language verbatim alongside your wiki-language synthesis.
 
 ### 8. Backlink audit — do not skip
 

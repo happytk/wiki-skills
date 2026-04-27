@@ -21,12 +21,13 @@ Bootstrap an LLM-maintained wiki inside a Roam Research graph using the [roam-mc
 
 Ask:
 1. **What is the domain/purpose?** (one sentence)
-2. **Which source kinds will you ingest?** Pick from `paper | article | transcript | code | book-excerpt | thread | dataset | notes | other`. Default is "all" — narrow it only if you want the schema to advertise a smaller set. (Each kind has its own Raw Text chunking rule; see `wiki-ingest`'s Source-kind taxonomy.)
-3. **What categories should `[[Wiki Index]]` use?**
+2. **What is the wiki's primary language?** (Korean / English / other) — this is the language for **wiki body content**: summaries, takeaways, entity descriptions, query answers, lint reports. Source text in `Raw Text::` always stays in the original language (verbatim). Default: Korean.
+3. **Which source kinds will you ingest?** Pick from `paper | article | transcript | code | book-excerpt | thread | dataset | notes | other`. Default is "all" — narrow it only if you want the schema to advertise a smaller set. (Each kind has its own Raw Text chunking rule; see `wiki-ingest`'s Source-kind taxonomy.)
+4. **What categories should `[[Wiki Index]]` use?**
    - Research default: `Sources | Entities | Concepts | Analyses`
    - Codebase default: `Modules | APIs | Decisions | Flows` — see `codebase.md` in this skill's directory for detailed codebase guidance
    - Or specify custom
-4. **Where should binary/oversized source files live on disk?** (absolute path, e.g. `~/wikis/ml-research/raw`) — text-extractable sources will be uploaded directly into Roam blocks; this folder is the fallback for PDFs, audio, datasets, etc.
+5. **Where should binary/oversized source files live on disk?** (absolute path, e.g. `~/wikis/ml-research/raw`) — text-extractable sources will be uploaded directly into Roam blocks; this folder is the fallback for PDFs, audio, datasets, etc.
 
 ### 2. Create the local `raw/` directory
 
@@ -53,6 +54,7 @@ Top-level blocks:
 ```
 Type:: #wiki-meta
 Domain:: <user's domain description>
+Language:: Korean      (or English / 다국어 — the language used for wiki BODY content; Raw Text:: stays in source language)
 Source kinds allowed::
   <one block per allowed kind, e.g. paper / article / transcript / ...>
 Raw path:: <absolute local path to raw/ directory>
@@ -87,6 +89,29 @@ Conventions
   Required attribute on every wiki page: Type::
   Last-edited time is tracked automatically by Roam (:edit/time on every block) — DO NOT write Updated:: blocks; they accumulate without a mutate API and Roam already exposes the canonical edit time
   Daily-note titles MUST use the ordinal date format (April 25th, 2026)
+  Language policy
+    The wiki has a primary Language:: attribute (default Korean)
+    All wiki BODY content is written in that language regardless of source
+    language: Summary, Key Takeaways, Description, Appearances notes,
+    Related Concepts, Reason::, Source:: prose, query Answer paragraphs,
+    Open Questions, lint report explanations, Fix:: prose, daily-note
+    log lines
+    Original-language verbatim is preserved ONLY in:
+      Raw Text:: blocks (one paragraph per block, source verbatim)
+      {{embed: ((uid))}} embeds and ((uid)) inline citations
+      Direct quotes — when quoting, mark with quotes and cite the uid
+    Page titles
+      Source pages (papers/articles/products): use the canonical published
+        name. If a Korean version is widely used, that; otherwise the
+        original (e.g. "Attention Is All You Need" stays English)
+      Entity / concept / analysis pages: use the wiki language
+        (e.g. [[트랜스포머]], not [[Transformer]])
+      For entities widely known by a non-wiki-language name, add an
+        Aliases:: parent attribute block on the page with one child per
+        alternate name. Other pages can ref either name; the wiki
+        canonicalizes to the wiki-language title
+    Code identifiers, Roam syntax ([[]], ((uid)), Key::), tag names,
+    file paths, URLs are NEVER translated — they are tokens, not prose
 
 Operation log
   Logs are appended to today's daily note as blocks tagged #wiki-log

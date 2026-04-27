@@ -39,6 +39,12 @@ Locate the wiki:
 2. Fall back to `roam_search_by_text("Wiki Schema")`
 3. If neither finds it, tell the user to run `wiki-init` first
 
+Read the schema for the **`Language::`** (default Korean), conventions, and mutation policy.
+
+## Language policy
+
+All prose this skill writes — `Reason::` child blocks, `Source::` notes, `Updated by::` tags, downstream-effect explanations, daily-note log lines, and the new content of any `roam_update_block` call that REPLACES wiki body — must be in the wiki's `Language::`. The diff display you show the user (Current / Proposed / Reason / Source) is also in the wiki language, with source-original text appearing only when the `Current` or `Proposed` IS source-language verbatim (e.g., editing a `Raw Text::` block to fix a transcription error). Direct quotations from sources are preserved via `((uid))` citations.
+
 ## Process (mutation enabled)
 
 ### 1. Identify what to update

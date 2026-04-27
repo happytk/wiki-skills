@@ -260,6 +260,25 @@ Tags:: #ml #transformer
 
 Last-edit time is **not** written as a `Updated::` block. Roam tracks `:edit/time` automatically on every block (visible in the right-sidebar block menu and queryable via `roam_datomic_query`); writing manual `Updated::` blocks just produces accumulating noise because there is no mutate API.
 
+### Language policy
+
+The wiki has a primary `Language::` attribute on `[[Wiki Schema]]` (default `Korean`, set at `wiki-init` time). All wiki **body content** — Summary, Key Takeaways, Description, query Answer prose, Open Questions, Reason::, Source:: notes, lint report explanations, daily-note log lines — is written in this language **regardless of the source's original language**.
+
+Original-language verbatim is preserved only in:
+
+- `Raw Text::` blocks (one paragraph per block, source verbatim — never translated)
+- `((uid))` inline block citations
+- `{{embed: ((uid))}}` blocks that render the original alongside the wiki-language synthesis
+
+So an English source ingested into a Korean wiki produces Korean Summary blocks that `((uid))`-cite into the English `Raw Text::` paragraphs. The reader gets Korean understanding with one click to the English original.
+
+**Page titles** follow a hybrid rule:
+
+- Source pages (papers, articles, products) keep their canonical published name — `[[Attention Is All You Need]]` stays English in a Korean wiki because that's how it's discovered and cited everywhere.
+- Entity / concept / analysis pages use the wiki language — `[[트랜스포머]]`, not `[[Transformer]]`, with an `Aliases::` parent attribute block listing common alternate names so backlinks stay intact.
+
+To switch the wiki's body language later, edit the `Language::` attribute on `[[Wiki Schema]]`. Existing pages aren't auto-translated — but new blocks the skills write will follow the new setting.
+
 ### Cross-references
 
 - `[[Page Title]]` — Roam-native page reference (no slug munging)

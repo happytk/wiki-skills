@@ -14,7 +14,13 @@ Locate the wiki:
 2. Fall back to `roam_search_by_text("Wiki Schema")` if missing
 3. If neither finds it, tell the user to run `wiki-init` first
 
-Read the schema for the index categories and conventions.
+Read the schema for the **`Language::`** (default Korean), index categories, and conventions.
+
+## Language policy
+
+Answer in the wiki's `Language::` regardless of the source pages' original language. If the user phrases the question in another language, mirror the user's question language for the conversational reply but write the **filed analysis page** (if the user accepts the save offer) in the wiki language. Original-language verbatim is preserved only via `((uid))` citations and `{{embed: ((uid))}}` blocks pointing into source `Raw Text::`.
+
+Concretely: if the wiki has English `Raw Text::` paragraphs and Language:: is Korean, the answer reads as Korean prose with English `((uid))` excerpts inline — the user gets Korean synthesis with one-click access to the English original.
 
 ## Process
 
@@ -46,11 +52,12 @@ For each candidate page:
 
 Write a response that:
 
+- **Is in the wiki's `Language::`** (Korean by default) for all prose. Source-original text appears only inside `((uid))` excerpts or `{{embed: ((uid))}}` blocks
 - Is grounded in the Roam pages and blocks you read
 - Cites every claim using **`[[Page Title]]`** for topical references and **`((uid))`** for specific quotes or precise claims drawn from a particular `Raw Text::` block
-- Inlines `{{embed: ((uid))}}` when the original phrasing carries weight (a quote, a number, a precise definition)
-- Notes agreements and disagreements between pages — flag them as `[[Page A]] says X but [[Page B]] says Y`
-- Flags gaps explicitly: "the wiki has no page on X" or "[[Page]] doesn't cover Y yet"
+- Inlines `{{embed: ((uid))}}` when the original phrasing carries weight (a quote, a number, a precise definition) — the embed renders source-language verbatim alongside your wiki-language synthesis
+- Notes agreements and disagreements between pages
+- Flags gaps explicitly (in the wiki language): "the wiki has no page on X" / "[[Page]] doesn't cover Y yet"
 - For each flagged gap, names a concrete next step (a paper, URL, file, or question) — this is what step 5 will offer to queue
 
 Format for the question type:

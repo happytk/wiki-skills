@@ -14,7 +14,11 @@ Locate the wiki:
 2. Fall back to `roam_search_by_text("Wiki Schema")`
 3. If neither finds it, tell the user to run `wiki-init` first
 
-Read the schema for category list and conventions.
+Read the schema for the **`Language::`** (default Korean), category list, and conventions.
+
+## Language policy
+
+The lint report page (`[[Lint <date>]]`), every `Fix::` recommendation, contradiction descriptions, coverage-gap suggestions, and the daily-note log line are written in the wiki's `Language::`. Page titles and `((uid))` citations from offending blocks are quoted as-is (they're tokens, not prose).
 
 ## Process
 
