@@ -32,16 +32,16 @@ Concretely: if the wiki has English `Raw Text::` paragraphs and Language:: is Ko
 
 For each candidate page:
 
-1. `roam_fetch_page_by_title(<title>)` — pulls 3 levels deep, which covers attribute blocks + section parents + first-level children.
-2. If the page has a `Raw Text::` section that was truncated by the depth limit, run a Datalog pull via `roam_datomic_query` to get all `Raw Text::` children (each block's `:block/uid` and `:block/string`):
+1. `roam_fetch_page_by_title(<title>)` — pulls 3 levels deep. On new-layout pages this surfaces `Type::` / `Meta` / `Notes` (depth 1), the attribute and section blocks under them (depth 2), and the first content blocks (depth 3). On legacy flat pages it surfaces attributes and section parents at depth 1 and first content blocks at depth 2. Either way, deeper content (e.g. `Raw Text` paragraphs on a new-layout page) needs the Datalog pull below.
+2. If the page has a `Raw Text` section that was truncated by the depth limit, run a Datalog pull via `roam_datomic_query` to get all `Raw Text` children (each block's `:block/uid` and `:block/string`). Locate `Raw Text` by string + page, not by direct-child position — that way the same query works for both new pages (where `Raw Text` lives under a `Notes` parent) and legacy flat pages (where it sits at the page top level):
 
    ```clojure
    [:find (pull ?c [:block/string :block/uid :block/order])
     :where
     [?p :node/title "<title>"]
-    [?p :block/children ?s]
-    [?s :block/string "Raw Text"]
-    [?s :block/children ?c]]
+    [?rt :block/string "Raw Text"]
+    [?rt :block/page ?p]
+    [?rt :block/children ?c]]
    ```
 
 3. Follow one hop of `[[Page]]` links if they look directly relevant. Don't go deeper than two hops without justification — it explodes context.
@@ -76,25 +76,28 @@ If **yes:**
 
 1. `roam_fetch_page_by_title(<title>)` — confirm it doesn't already exist with content.
 2. `roam_create_page(<title>)`.
-3. Build the page with attribute blocks at depth 0 and section blocks below. Multi-value attributes use parent + children; one idea per block.
+3. Build the page using the three-group top level (`Type::` / `Meta` / `Notes`) — `#wiki-analysis` is a content page like `#wiki-source` and follows the same hierarchy. Multi-value attributes use parent + children; one idea per block.
 
    ```
    Type:: #wiki-analysis
-   Question:: <verbatim user question>
-   Sources::
-     [[<page1>]]
-     [[<page2>]]
-     ...
 
-   Answer
-     <paragraph 1 — one block, with ((uid)) and [[Page]] citations>
-     <paragraph 2 — one block>
-     {{embed: ((uid-of-key-quote))}}     (its own block)
+   Meta
+     Question:: <verbatim user question>
+     Sources::
+       [[<page1>]]
+       [[<page2>]]
+       ...
 
-   Open Follow-ups
-     <follow-up question 1 — one block>
-     <follow-up question 2 — one block>
-     <suggested source to ingest — one block>
+   Notes
+     Answer
+       <paragraph 1 — one block, with ((uid)) and [[Page]] citations>
+       <paragraph 2 — one block>
+       {{embed: ((uid-of-key-quote))}}     (its own block)
+
+     Open Follow-ups
+       <follow-up question 1 — one block>
+       <follow-up question 2 — one block>
+       <suggested source to ingest — one block>
    ```
 
    The `Answer` blocks should re-use the same `((uid))`s the synthesis cited so the analysis stays auditable to source.
