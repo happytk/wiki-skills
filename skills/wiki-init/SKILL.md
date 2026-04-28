@@ -217,6 +217,8 @@ Key Entities / Concepts
   Populated as pages are created.
 ```
 
+**Section ordering convention:** all three content sections (`Current Understanding`, `Open Questions`, `Key Entities / Concepts`) are **reverse-chronological** — newest entries on top. `wiki-ingest`, `wiki-query`, and `wiki-update` write new children with `roam_create_block(..., order=0)` so the latest item is always the first thing the reader sees. Past entries are never deleted just because they're old (append-only history); they simply move down as new ones are prepended.
+
 ### 7. Log the init operation
 
 Append a block to today's daily note (call `roam_create_block` with NO `page` arg — defaults to today's daily note). Use the ordinal date format if you need to reference the daily note explicitly. Multi-value attributes are parent + children, never comma-joined into one string.

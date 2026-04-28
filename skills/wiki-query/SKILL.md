@@ -144,7 +144,7 @@ For each accepted gap, append a queue TODO. Drop it under today's daily note by 
   Queued:: <today, ordinal>
 ```
 
-If the gap is a question that needs investigation rather than a specific source to ingest (e.g., "is X compatible with Y?"), append it to `[[Wiki Overview]]`'s `Open Questions` section as a plain block — those don't belong in the ingest queue.
+If the gap is a question that needs investigation rather than a specific source to ingest (e.g., "is X compatible with Y?"), prepend it to `[[Wiki Overview]]`'s `Open Questions` section as a plain block (`roam_create_block(..., order=0)` — newest first) — those don't belong in the ingest queue.
 
 After queuing, append a child block to the daily-note query log:
 

@@ -128,8 +128,8 @@ If the one-line summary for any updated page changed, find the index entry block
 Re-read `[[Wiki Overview]]`. If the change shifts the synthesis:
 
 - A claim under `Current Understanding` is now wrong → `roam_update_block` it (or `roam_delete_block` if simply obsolete)
-- An open question was resolved → `roam_delete_block` the question and add a one-line resolution under `Current Understanding`
-- A new question opened → append a child under `Open Questions` (additive)
+- An open question was resolved → `roam_delete_block` the question and prepend a one-line resolution under `Current Understanding` (`roam_create_block(..., order=0)`)
+- A new question opened → prepend a child under `Open Questions` (`roam_create_block(..., order=0)` — newest first)
 
 Use the same per-change confirm flow.
 

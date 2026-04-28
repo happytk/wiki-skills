@@ -233,11 +233,11 @@ For any new entity/concept pages created in step 7, add those under their catego
 ### 10. Update `[[Wiki Overview]]`
 
 Fetch `[[Wiki Overview]]`. If this source:
-- Introduces a significant concept → append a child block under `Key Entities / Concepts` referencing `[[<concept>]]`
-- Shifts the overall understanding → append a child block under `Current Understanding` (do not delete the old one — append-only)
-- Raises a new question → append under `Open Questions`
+- Introduces a significant concept → prepend a child block under `Key Entities / Concepts` referencing `[[<concept>]]` (`roam_create_block(..., order=0)`)
+- Shifts the overall understanding → prepend a child block under `Current Understanding` (do not delete the old one — newest on top, past conclusions stay below)
+- Raises a new question → prepend under `Open Questions`
 
-Roam tracks the page's last-edit time via `:edit/time` on the appended blocks; no manual `Updated::` block needed.
+All three sections are reverse-chronological — newest first. Pass `order=0` to `roam_create_block` so the new block lands as the section's first child. Roam tracks the page's last-edit time via `:edit/time` on the new blocks; no manual `Updated::` block needed.
 
 ### 11. Surface follow-up suggestions and offer to queue
 
