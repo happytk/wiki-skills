@@ -148,6 +148,40 @@ Meta
 
 **Pre-write validation (mandatory).** Before EVERY `roam_create_block` / `roam_create_page` / `roam_add_todo` call, verify each `content` field — including every `content` inside the `children` tree — is a non-empty string. If a value is `undefined`, `null`, an empty string, or the literal string `"undefined"`/`"null"`, **drop that entry** (don't send it) and surface the gap to the user before proceeding. The auto `#ai` suffix concat means an undefined value renders as a literal `undefined #ai` block in Roam — `roam_delete_block` can clean it up but only when `X-Roam-Mutate: true`, so don't write it in the first place.
 
+**Proofread before write (mandatory when `Language::` uses a non-Latin script — Korean, Japanese, Chinese, Cyrillic, Arabic, Devanagari).** LLM token-level generation occasionally produces a wrong-but-valid syllable in CJK/non-Latin output (e.g., `카테고리` → `쳤터고리`). UTF-8 stays intact through roam-mcp, so this is a generation issue, not an encoding one — the only durable fix is a self-review before the prose hits Roam.
+
+Run **one batched proofread call per ingest**, covering every wiki-language prose block drafted for the upcoming write pass:
+
+- Source page: Summary paragraphs, Key Takeaways bullets, Entities & Concepts one-line notes, Relation to Other Wiki Pages paragraphs
+- Entity / concept pages (step 7): Description paragraphs, Appearances notes, Related Concepts relationship strings
+
+To make the single batched call possible, **draft the entity / concept prose up front during step 6** (after Raw Text uids are captured) instead of just-in-time inside step 7. Hold every drafted block in memory keyed by its target write call.
+
+**Excluded from proofread** (do not include these in the proofread payload):
+
+- `Raw Text` blocks — source-verbatim; "correcting" them would corrupt the citation handle and falsify the audit trail
+- Page titles, attribute keys (`Source::`, `Tags::`), `[[refs]]`, `((uids))`, URLs, file paths, code identifiers — tokens, not prose
+- Source-language direct quotations and `{{embed: ((uid))}}` blocks
+
+**Issues-only return format** (keeps output tokens minimal — most blocks pass without a rewrite):
+
+```
+For each block below, decide if it contains a likely token-level corruption
+typo (e.g. wrong syllable, dropped character, swapped Hangul jamo, transposed
+Kanji). If yes, return { "index": <N>, "original": "<…>", "corrected": "<…>" }.
+If no, omit it. Return [] if all blocks are clean. Do NOT rewrite for style,
+flow, or word choice — only fix obvious token-level errors.
+
+Blocks:
+[1] <block content>
+[2] <block content>
+...
+```
+
+Apply each returned correction to the corresponding draft block before issuing the `roam_create_block` calls. If the call returns `[]`, write as drafted.
+
+**Skip the proofread step entirely when `Language::` is Latin-script** (English, Spanish, French, German, Portuguese, etc.) — token-level corruption is rare in Latin LLM output and the cost-benefit doesn't justify the extra call.
+
 **Idempotency on re-ingest.** If you're re-ingesting an updated source, fetch the existing source page first and walk the existing `Raw Text` children. The page may use the new `Notes` > `Raw Text` layout or the legacy flat layout (Raw Text at page top level) — locate `Raw Text` by string + page rather than by direct-child position so the walk works either way. A depth-tolerant Datalog pull:
 
 ```clojure
@@ -172,6 +206,8 @@ Then:
 The mutation calls require the `X-Roam-Mutate: true` header on your MCP entry; without it, fall back to the v2.0 append-only behavior (rule 4 only) and tell the user that re-ingest could not refresh existing blocks in place.
 
 ### 7. Update entity and concept pages
+
+By the time you reach step 7, the proofread pass from step 6 has already corrected the drafted Description / Appearances notes / Related Concepts strings (when `Language::` is non-Latin). Use the corrected drafts as the `content` for the `roam_create_block` / `roam_create_page` calls below; do not re-generate the prose.
 
 For each entity/concept this source touches:
 
